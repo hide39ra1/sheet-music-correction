@@ -671,8 +671,11 @@ document.addEventListener('keydown', event => {
 
   const modes = ['after','split','overlay'];
   switch (key) {
-    case 'arrowleft': ui.prev.click(); break;
-    case 'arrowright': ui.next.click(); break;
+    case 'arrowleft':
+    case 'arrowright':
+      if (event.target.closest?.('#comparison')) return;
+      (key === 'arrowleft' ? ui.prev : ui.next).click();
+      break;
     case 'home':
     case 'end':
       if (event.target.closest?.('#comparison')) return;
