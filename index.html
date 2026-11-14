@@ -31,8 +31,8 @@ main{padding:14px 20px}
 #workspace{gap:12px;margin-top:0;grid-template-columns:clamp(140px,15vw,205px) minmax(0,1fr) clamp(215px,21vw,280px)}
 #workspace>.card,#workspace>aside{padding:12px}
 #workspace>aside,#workspace>.panel{max-height:calc(100dvh - 125px);overflow:auto}
-#comparison{max-height:calc(100dvh - 245px);min-height:220px}
-.views[data-zoom="fit"] canvas{max-height:calc(max(220px, 100dvh - 245px) - 54px);width:auto;max-width:100%;margin-inline:auto}
+#comparison{--preview-height:max(220px, calc(100dvh - 245px));max-height:var(--preview-height);min-height:180px}
+.views[data-zoom="fit"] canvas{max-height:calc(var(--preview-height) - 54px);width:auto;max-width:100%;margin-inline:auto}
 .views[data-zoom="fit"] .sheet{width:fit-content;max-width:100%;margin-inline:auto}
 .views[data-zoom="fit"] .sheet canvas+canvas{width:100%;height:100%;margin:0}
 #dropZone[hidden]{display:none}
@@ -155,6 +155,16 @@ PDFをここにドラッグ＆ドロップ
 const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e => [e.id,e]));
 const collator = new Intl.Collator('ja', {numeric:true});
 const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
+function fitPreviewHeight() {
+  if (ui.workspace.hidden) return;
+  const top = ui.comparison.getBoundingClientRect().top + window.scrollY;
+  ui.comparison.style.setProperty('--preview-height', Math.max(180, window.innerHeight - top - 20) + 'px');
+}
+const previewLayout = new ResizeObserver(fitPreviewHeight);
+for (const element of [document.querySelector('header'),ui.margins,ui.pdfNameOptions,ui.comparison.previousElementSibling]) {
+  previewLayout.observe(element);
+}
+window.addEventListener('resize', fitPreviewHeight, {passive:true});
 let sources = [], pages = [], active = 0, isPdf = false, ready = false;
 let dirty = false;
 let rotationUndo;
@@ -333,6 +343,7 @@ function orientedMargins(page) {
 }
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
+  fitPreviewHeight();
   ui.pdfNameOptions.hidden = !isPdf;
   updatePdfName();
   ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
