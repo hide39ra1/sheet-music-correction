@@ -70,24 +70,34 @@ def poppler(*args):
     return subprocess.check_output(args, stderr=subprocess.PIPE, timeout=300)
 
 
-def load_pdf(source, folder):
+def pdf_dimensions(source):
     count = pdf_page_count(source)
     info = poppler("pdfinfo", "-f", "1", "-l", str(count), str(source)).decode(errors="replace")
     sizes = re.findall(r"Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+)", info)
     rotations = re.findall(r"Page\s+\d+\s+rot:\s+(\d+)", info)
     if len(sizes) != count:
         raise ValueError("PDFのページ寸法を取得できませんでした")
-    poppler("pdftoppm", "-cropbox", "-r", "300", "-png", str(source), str(folder / "page"))
-    paths = sorted(folder.glob("page-*.png"))
-    pages = []
-    for index, (path, (w, h)) in enumerate(zip(paths, sizes)):
+    dimensions = []
+    for index, (w, h) in enumerate(sizes):
         w, h = float(w), float(h)
         if rotations and int(rotations[index]) % 180:
             w, h = h, w
-        pages.append((path, (w, h)))
-    if len(pages) != count:
-        raise ValueError("PDFの一部を読み込めませんでした")
-    return pages
+        dimensions.append((w, h))
+    return dimensions
+
+
+def pdf_pages(source, folder, dimensions):
+    batch_size = 8
+    for start in range(0, len(dimensions), batch_size):
+        batch = dimensions[start:start + batch_size]
+        poppler("pdftoppm", "-f", str(start + 1), "-l", str(start + len(batch)),
+                "-cropbox", "-r", "300", "-png", str(source), str(folder / "page"))
+        paths = sorted(folder.glob("page-*.png"))
+        if len(paths) != len(batch):
+            raise ValueError("PDFの一部を読み込めませんでした")
+        for path, size in zip(paths, batch):
+            yield path, size
+            path.unlink()
 
 
 def pdf_page_count(source):
@@ -198,7 +208,7 @@ class Server(BaseHTTPRequestHandler):
                 if self.headers.get("Accept") == "application/x-ndjson":
                     self.stream_analysis(source, folder, pdf)
                     return
-                pages = load_pdf(source, folder) if pdf else [(source, None)]
+                pages = pdf_pages(source, folder, pdf_dimensions(source)) if pdf else [(source, None)]
                 previews = []
                 for path, _ in pages:
                     image = rgb(path)
@@ -209,9 +219,10 @@ class Server(BaseHTTPRequestHandler):
                     previews.append({"angle": angle, "preview": base64.b64encode(preview.getvalue()).decode()})
                 self.reply(json.dumps(previews).encode(), "application/json")
             elif self.path == "/export":
-                pages = load_pdf(source, folder) if pdf else [(source, None)]
+                dimensions = pdf_dimensions(source) if pdf else [None]
+                pages = pdf_pages(source, folder, dimensions) if pdf else [(source, None)]
                 settings = json.loads(settings_data)
-                if len(settings) != len(pages):
+                if len(settings) != len(dimensions):
                     raise ValueError("ページ設定の数が一致しません")
                 def images():
                     for (path, dimensions), (angle, flip, fit, *options) in zip(pages, settings):
@@ -221,7 +232,7 @@ class Server(BaseHTTPRequestHandler):
                         yield corrected(rgb(path), angle, flip, fit, *options), dimensions
                 output = io.BytesIO()
                 if pdf:
-                    write_pdf(output, _PageStream(len(pages), images()))
+                    write_pdf(output, _PageStream(len(dimensions), images()))
                 else:
                     image, _ = next(images())
                     image.save(output, FORMATS[fmt], **({"quality": 95} if fmt in (".jpg", ".jpeg", ".webp") else {}))
