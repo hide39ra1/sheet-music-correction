@@ -513,7 +513,7 @@ function edgeDistances(event) {
   return [50+y*100/h,50-x*100/w,50-y*100/h,50+x*100/w];
 }
 ui.handles.onpointerdown = event => {
-  if (!ui.editEdges.checked) return;
+  if (!ui.editEdges.checked || drag || event.button !== 0 || !event.isPrimary) return;
   const distances = edgeDistances(event);
   const errors = distances.map((distance,i) => Math.abs(distance-Math.max(0.6,pages[active].margins[i])));
   const distance = Math.min(...errors);
