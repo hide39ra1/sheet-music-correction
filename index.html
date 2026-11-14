@@ -661,6 +661,7 @@ ui.mode.onchange = () => {
   ui.views.dataset.mode = ui.mode.value;
   ui.opacityControl.hidden = ui.mode.value !== 'overlay';
   ui.caption.textContent = ui.mode.value === 'overlay' ? '重ねて比較' : '補正後';
+  ui.zoom.onchange();
   draw();
 };
 ui.opacity.oninput = draw;
@@ -683,7 +684,8 @@ ui.zoom.onchange = () => {
   const x = (box.scrollLeft + box.clientWidth/2) / ui.views.offsetWidth;
   const y = (box.scrollTop + box.clientHeight/2) / ui.views.offsetHeight;
   ui.views.dataset.zoom = ui.zoom.value === '1' ? 'fit' : 'custom';
-  ui.views.style.width = Number(ui.zoom.value) * 100 + '%';
+  const factor = ui.mode.value === 'split' && ui.zoom.value !== '1' ? 2 : 1;
+  ui.views.style.width = Number(ui.zoom.value) * factor * 100 + '%';
   box.scrollTo(x*ui.views.offsetWidth-box.clientWidth/2,y*ui.views.offsetHeight-box.clientHeight/2);
 };
 ui.reset.onclick = () => {
