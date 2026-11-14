@@ -66,7 +66,7 @@ header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
 <span id="unsaved" hidden>未保存の調整あり</span>
 <button id="help" aria-keyshortcuts="Shift+/" aria-haspopup="dialog">キー操作</button>
 </div>
-<p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
+<p id="status" role="status" tabindex="0" aria-label="処理状況">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
 <progress id="progress" aria-label="処理の進捗" style="width:100%;accent-color:#235745" hidden></progress>
 <button id="cancelLoad" hidden>読み込みを中止</button>
 <button id="retryLoad" hidden>読み込みを再試行</button>
@@ -910,7 +910,7 @@ document.addEventListener('keydown', event => {
       break;
     case 'home':
     case 'end':
-      if (event.target.closest?.('#comparison')) return;
+      if (event.target.closest?.('#comparison, #status')) return;
       select(key === 'home' ? 0 : pages.length - 1);
       break;
     case '[': ui.less.click(); break;
