@@ -357,6 +357,10 @@ async function load(files, pdf) {
     ui.cancelLoad.hidden = true;
     ui.progress.hidden = true;
     busy(false); ui.pdf.value = ui.folder.value = '';
+    if (document.activeElement === document.body) {
+      (ready ? ui.jump.querySelector('button') : ui.retryLoad.hidden ? ui.pdf : ui.retryLoad)
+        .focus({preventScroll:true});
+    }
   }
 }
 function renderPages() {
