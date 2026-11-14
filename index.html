@@ -510,14 +510,18 @@ ui.save.onclick = async () => {
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
       const name = path(sources[0]).split('/')[0] + '-補正-' + Date.now();
       const root = await parent.getDirectoryHandle(name,{create:true});
+      ui.progress.max = sources.length;
+      ui.progress.value = 0;
+      ui.progress.hidden = false;
       for (const [i,file] of sources.entries()) {
-        ui.status.textContent = '画像を保存中 ' + (i+1) + ' / ' + sources.length;
+        ui.status.textContent = '画像を保存中 · ' + i + ' / ' + sources.length + '枚完了';
         const blob = await (await api('/export',file,[settings[i]])).blob();
         let dir = root;
         for (const name of path(file).split('/').slice(1,-1)) dir = await dir.getDirectoryHandle(name,{create:true});
         const handle = await dir.getFileHandle(file.name,{create:true});
         const writer = await handle.createWritable();
         await writer.write(blob); await writer.close();
+        ui.progress.value = i + 1;
       }
     }
     setDirty(false);
