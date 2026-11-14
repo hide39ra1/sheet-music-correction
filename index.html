@@ -28,6 +28,9 @@ main{padding:14px 20px}
 #workspace>.card,#workspace>aside{padding:12px}
 #workspace>aside,#workspace>.panel{max-height:calc(100dvh - 125px);overflow:auto}
 #comparison{max-height:calc(100dvh - 245px);min-height:220px}
+.views[data-zoom="fit"] canvas{max-height:calc(max(220px, 100dvh - 245px) - 54px);width:auto;max-width:100%;margin-inline:auto}
+.views[data-zoom="fit"] .sheet{width:fit-content;max-width:100%;margin-inline:auto}
+.views[data-zoom="fit"] .sheet canvas+canvas{width:100%;height:100%;margin:0}
 #dropZone[hidden]{display:none}
 @media(max-width:900px){#workspace{grid-template-columns:135px minmax(0,1fr)}.panel{grid-column:2}#workspace>.panel{max-height:none}}
 @media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}#workspace>aside{max-height:160px}}
@@ -86,7 +89,7 @@ PDFをここにドラッグ＆ドロップ
 </div>
 </fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
-<div class="views" id="views" data-mode="after">
+<div class="views" id="views" data-mode="after" data-zoom="fit">
 <figure id="original"><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
 <figure><figcaption id="caption">補正後</figcaption><div class="sheet">
 <canvas id="after" aria-label="補正後の譜面"></canvas><canvas id="handles" aria-hidden="true"></canvas>
@@ -492,6 +495,7 @@ ui.zoom.onchange = () => {
   const box = ui.comparison;
   const x = (box.scrollLeft + box.clientWidth/2) / ui.views.offsetWidth;
   const y = (box.scrollTop + box.clientHeight/2) / ui.views.offsetHeight;
+  ui.views.dataset.zoom = ui.zoom.value === '1' ? 'fit' : 'custom';
   ui.views.style.width = Number(ui.zoom.value) * 100 + '%';
   box.scrollTo(x*ui.views.offsetWidth-box.clientWidth/2,y*ui.views.offsetHeight-box.clientHeight/2);
 };
