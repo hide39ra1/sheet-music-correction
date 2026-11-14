@@ -24,6 +24,10 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 #pdfNameOptions summary{cursor:pointer;color:#235745}
 #margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
 #margins p{margin:0;font-size:13px}
+.panel>.actions,#detection{margin-bottom:10px}
+.panel details{margin-top:12px;padding-top:10px;border-top:1px solid #d7dfd8}
+.panel summary{cursor:pointer;color:#235745}
+.panel details .actions{margin-top:8px}
 #shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
 #shortcuts::backdrop{background:#10291e88}#shortcuts h2{margin-top:0}#shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:8px 20px}#shortcuts dd{margin:0}#help{color:#18352d}
 #handles.editing{touch-action:none;cursor:crosshair}
@@ -129,7 +133,11 @@ PDFをここにドラッグ＆ドロップ
 <button id="resetAngle">角度を検出値に戻す</button>
 <div class="actions">
 <label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
-<label>一括180°回転 <select id="rotationPattern">
+</div>
+<details>
+<summary>一括180°回転</summary>
+<div class="actions">
+<label>対象 <select id="rotationPattern">
 <option value="even">偶数ページ</option>
 <option value="odd">奇数ページ</option>
 <option value="all">すべて</option>
@@ -138,6 +146,7 @@ PDFをここにドラッグ＆ドロップ
 <button id="even">適用</button>
 <button id="undoRotation" disabled>一括回転を元に戻す</button>
 </div>
+</details>
 
 </div></section>
 </main>
