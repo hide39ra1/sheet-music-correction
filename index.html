@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>譜面補正</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#edf0eb;color:#202a25;font:15px system-ui,sans-serif}header{background:#18352d;color:#fff;padding:28px max(20px,5vw)}h1{margin:0;font-size:34px}p{line-height:1.55}main{max-width:1400px;margin:auto;padding:24px}.bar,.card,aside{background:white;border:1px solid #d7dfd8;border-radius:12px;padding:16px}.bar,.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,.pick{font:inherit;padding:8px 13px;border:1px solid #9caca4;border-radius:7px;background:white;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.primary{background:#235745;color:white;border-color:#235745}.pick input{position:absolute;opacity:0;width:1px}.pick:focus-within{outline:2px solid}#workspace{display:grid;grid-template-columns:230px 1fr;gap:16px;margin-top:16px}#workspace[hidden]{display:none}aside{max-height:75vh;overflow:auto}aside button{display:block;width:100%;margin-bottom:7px;text-align:left;overflow-wrap:anywhere}aside button[aria-current=true]{background:#dcece3;border-color:#235745}.views{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}figure{margin:0;min-width:0}figcaption{margin-bottom:6px;font-weight:600}canvas{width:100%;display:block;border:1px solid #d7dfd8;background:white}.card h2{margin-top:0;overflow-wrap:anywhere}input[type=number]{width:76px;font:inherit}#status{min-height:1.5em;overflow-wrap:anywhere}@media(max-width:700px){main{padding:12px}#workspace{grid-template-columns:1fr}aside{max-height:160px}}
+*{box-sizing:border-box}body{margin:0;background:#edf0eb;color:#202a25;font:15px system-ui,sans-serif}header{background:#18352d;color:#fff;padding:28px max(20px,5vw)}h1{margin:0;font-size:34px}p{line-height:1.55}main{max-width:1400px;margin:auto;padding:24px}.bar,.card,aside{background:white;border:1px solid #d7dfd8;border-radius:12px;padding:16px}.bar,.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,.pick{font:inherit;padding:8px 13px;border:1px solid #9caca4;border-radius:7px;background:white;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.primary{background:#235745;color:white;border-color:#235745}.pick input{position:absolute;opacity:0;width:1px}.pick:focus-within{outline:2px solid}#workspace{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;margin-top:16px}#workspace[hidden]{display:none}aside{max-height:75vh;overflow:auto}aside button{display:block;width:100%;margin-bottom:7px;text-align:left;overflow-wrap:anywhere}aside button[aria-current=true]{background:#dcece3;border-color:#235745}.views{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}figure{margin:0;min-width:0}figcaption{margin-bottom:6px;font-weight:600}canvas{width:100%;display:block;border:1px solid #d7dfd8;background:white}.card h2{margin-top:0;overflow-wrap:anywhere}input[type=number]{width:76px;font:inherit}#status{min-height:1.5em;overflow-wrap:anywhere}@media(max-width:700px){main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}aside{max-height:160px}}
 </style>
 <header><h1>譜面補正</h1><p>スキャンした楽譜の傾きと上下の向きを整えます。</p></header>
 <main>
@@ -28,10 +28,20 @@
 <label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
 <button id="even">全ページを奇数正常・偶数反転に戻す</button>
 </div>
-<div class="views">
+<div class="actions">
+<label><input id="guide" type="checkbox"> 水平ガイド</label>
+<label>表示倍率 <select id="zoom">
+<option value="1">全体</option>
+<option value="1.5">150%</option>
+<option value="2">200%</option>
+<option value="3">300%</option>
+</select></label>
+</div>
+<div id="comparison" style="overflow:auto" tabindex="0" aria-label="補正前後の比較">
+<div class="views" id="views">
 <figure><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
 <figure><figcaption>補正後</figcaption><canvas id="after" aria-label="補正後の譜面"></canvas></figure>
-</div></div></section>
+</div></div></div></section>
 </main>
 <script>
 const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e => [e.id,e]));
@@ -118,6 +128,18 @@ function draw() {
       ctx.rotate(rad + (flip ? Math.PI : 0));
     }
     ctx.drawImage(image,-w/2,-h/2);
+    if (ui.guide.checked) {
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.strokeStyle = '#087ca5';
+      ctx.setLineDash([6,4]);
+      ctx.beginPath();
+      for (let row = 1; row < 12; row++) {
+        const y = row * h / 12;
+        ctx.moveTo(0,y);
+        ctx.lineTo(w,y);
+      }
+      ctx.stroke();
+    }
   }
 }
 function download(blob,name) {
@@ -163,6 +185,8 @@ ui.angle.oninput = () => {
 ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
 ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; draw(); };
 ui.fit.onchange = draw;
+ui.guide.onchange = draw;
+ui.zoom.onchange = () => { ui.views.style.width = Number(ui.zoom.value) * 100 + '%'; };
 ui.reset.onclick = () => {
   pages[active].angle = pages[active].detected ?? 0;
   pages[active].flip = active % 2 === 1;
