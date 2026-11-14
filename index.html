@@ -500,6 +500,7 @@ ui.save.onclick = async () => {
   let savedImages = 0;
   let outputFolder;
   let outputPdf;
+  let exportingImage;
   busy(true);
   ui.workspace.inert = true;
   ui.save.textContent = '保存中…';
@@ -522,6 +523,7 @@ ui.save.onclick = async () => {
       ui.progress.value = 0;
       ui.progress.hidden = false;
       for (const [i,file] of sources.entries()) {
+        exportingImage = path(file);
         ui.status.textContent = '画像を保存中 · ' + i + ' / ' + sources.length + '枚完了';
         const blob = await (await api('/export',file,[settings[i]])).blob();
         let dir = root;
@@ -537,7 +539,8 @@ ui.save.onclick = async () => {
       ? '「' + outputPdf + '」のダウンロードを開始しました。'
       : '「' + outputFolder + '」に ' + savedImages + '枚を保存しました。';
   } catch (error) {
-    const message = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
+    const message = error.name === 'AbortError' ? '保存をキャンセルしました。'
+      : (exportingImage ? '「' + exportingImage + '」を保存できませんでした。' : '') + error.message;
     ui.status.textContent = savedImages
       ? message + ' 「' + outputFolder + '」に ' + savedImages + ' / ' + sources.length + '枚を保存しました。'
       : message;
