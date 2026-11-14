@@ -474,12 +474,12 @@ ui.handles.onpointerdown = event => {
   const distance = Math.min(...errors);
   if (distance > 5) return;
   const edge = errors.indexOf(distance);
-  drag = {edge, pointer:event.pointerId, original:pages[active].margins[edge]};
+  drag = {edge, pointer:event.pointerId, original:pages[active].margins[edge], start:distances[edge]};
   ui.handles.setPointerCapture(event.pointerId);
 };
 ui.handles.onpointermove = event => {
   if (drag?.pointer !== event.pointerId) return;
-  const value = edgeDistances(event)[drag.edge];
+  const value = drag.original + edgeDistances(event)[drag.edge] - drag.start;
   const page = pages[active];
   page.margins[drag.edge] = Math.round(Math.min(20,Math.max(0,value))*10)/10;
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
