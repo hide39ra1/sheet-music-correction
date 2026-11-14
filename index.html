@@ -52,6 +52,7 @@ main{padding:14px 20px}
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
 <progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
 <button id="cancelLoad" hidden>読み込みを中止</button>
+<button id="retryLoad" hidden>読み込みを再試行</button>
 </header>
 <main>
 <div id="dropZone" style="border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
@@ -174,6 +175,7 @@ const path = file => file.webkitRelativePath || file.name;
 const extension = file => '.' + file.name.split('.').pop().toLowerCase();
 
 let loading;
+let failedImport;
 async function api(route, file, settings, signal) {
   const headers = {'X-Format': extension(file)};
   if (route === '/analyse') headers.Accept = 'application/x-ndjson';
@@ -222,6 +224,8 @@ async function load(files, pdf) {
     return;
   }
   const previous = {sources,pages,active,isPdf,ready,dirty,fit:ui.fit.checked,pdfName:ui.pdfName.value};
+  failedImport = undefined;
+  ui.retryLoad.hidden = true;
   setDirty(false);
   loading = new AbortController();
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
@@ -282,6 +286,10 @@ async function load(files, pdf) {
     ui.dropZone.hidden = !!pages.length;
     if (pages.length) select(active);
     ui.status.textContent = loading.signal.aborted ? '読み込みを中止しました。' : error.message;
+    if (!loading.signal.aborted) {
+      failedImport = {files,pdf};
+      ui.retryLoad.hidden = false;
+    }
   } finally {
     loading = undefined;
     ui.cancelLoad.hidden = true;
@@ -500,6 +508,9 @@ function updatePdfName() {
 }
 ui.pdfName.oninput = updatePdfName;
 ui.cancelLoad.onclick = () => loading?.abort();
+ui.retryLoad.onclick = () => {
+  if (failedImport && !ui.pdf.disabled) load(failedImport.files,failedImport.pdf);
+};
 function isFileDrag(event) {
   return event.dataTransfer.types.includes('Files');
 }
