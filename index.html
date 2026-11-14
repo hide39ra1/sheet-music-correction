@@ -47,7 +47,12 @@ PDFをここにドラッグ＆ドロップ
 </aside>
 <div class="card viewer">
 <nav class="actions" aria-label="ページ送り">
-<button id="prev">前へ</button><span id="position"></span><button id="next">次へ</button>
+<button id="prev">前へ</button>
+<form id="jump" class="actions">
+<input id="pageNumber" aria-label="移動先のページ番号" type="number" min="1" step="1" required>
+<span id="position"></span><button type="submit">移動</button>
+</form>
+<button id="next">次へ</button>
 </nav>
 <div class="actions">
 <label>表示 <select id="mode">
@@ -235,7 +240,9 @@ function renderPages() {
   });
   ui.prev.disabled = nextIndex(-1) === -1;
   ui.next.disabled = nextIndex(1) === -1;
-  ui.position.textContent = (active+1) + ' / ' + pages.length + 'ページ';
+  ui.position.textContent = ' / ' + pages.length + 'ページ';
+  ui.pageNumber.max = pages.length;
+  if (document.activeElement !== ui.pageNumber) ui.pageNumber.value = active + 1;
   ui.pages.replaceChildren(...entries);
 }
 function orientedMargins(page) {
@@ -244,6 +251,7 @@ function orientedMargins(page) {
 }
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
+  ui.pageNumber.value = index + 1;
   drag = null;
   if (active !== index) ui.comparison.scrollTo(0,0);
   active = index;
@@ -446,6 +454,11 @@ ui.applyMargins.onclick = () => {
   renderPages();
 };
 ui.prev.onclick = () => select(nextIndex(-1));
+ui.jump.onsubmit = event => {
+  event.preventDefault();
+  const index = ui.pageNumber.valueAsNumber - 1;
+  if (Number.isInteger(index) && index >= 0 && index < pages.length) select(index);
+};
 ui.next.onclick = () => select(nextIndex(1));
 ui.mode.onchange = () => {
   ui.views.dataset.mode = ui.mode.value;
