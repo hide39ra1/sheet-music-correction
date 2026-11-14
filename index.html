@@ -34,7 +34,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .panel details .actions{margin-top:8px}
 #shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
 #shortcuts::backdrop{background:#10291e88}#shortcuts h2{margin-top:0}#shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:8px 20px}#shortcuts dd{margin:0}#help{color:#18352d}
-#handles.editing{touch-action:none;cursor:crosshair}
+#handles.editing{touch-action:none}
 main{padding:14px 20px}
 #workspace{gap:12px;margin-top:0;grid-template-columns:clamp(140px,15vw,205px) minmax(0,1fr) clamp(215px,21vw,280px)}
 #workspace>.card,#workspace>aside{padding:12px}
@@ -512,17 +512,24 @@ function edgeDistances(event) {
   const {x,y} = point.matrixTransform(edgeTransform);
   return [50+y*100/h,50-x*100/w,50-y*100/h,50+x*100/w];
 }
+function nearestEdge(distances) {
+  const errors = distances.map((distance,i) => Math.abs(distance-Math.max(0.6,pages[active].margins[i])));
+  const distance = Math.min(...errors);
+  return distance <= 5 ? errors.indexOf(distance) : -1;
+}
 ui.handles.onpointerdown = event => {
   if (!ui.editEdges.checked || drag || event.button !== 0 || !event.isPrimary) return;
   const distances = edgeDistances(event);
-  const errors = distances.map((distance,i) => Math.abs(distance-Math.max(0.6,pages[active].margins[i])));
-  const distance = Math.min(...errors);
-  if (distance > 5) return;
-  const edge = errors.indexOf(distance);
+  const edge = nearestEdge(distances);
+  if (edge === -1) return;
   drag = {edge, pointer:event.pointerId, original:pages[active].margins[edge], start:distances[edge]};
   ui.handles.setPointerCapture(event.pointerId);
 };
 ui.handles.onpointermove = event => {
+  if (!drag && ui.editEdges.checked) {
+    const edge = nearestEdge(edgeDistances(event));
+    ui.handles.style.cursor = edge === -1 ? '' : edge % 2 ? 'ew-resize' : 'ns-resize';
+  }
   if (drag?.pointer !== event.pointerId) return;
   const value = drag.original + edgeDistances(event)[drag.edge] - drag.start;
   const page = pages[active];
@@ -747,6 +754,7 @@ ui.mode.onchange = () => {
 };
 ui.opacity.oninput = () => { savePreviewPreferences(); draw(); };
 ui.editEdges.onchange = () => {
+  ui.handles.style.cursor = '';
   ui.handles.classList.toggle('editing',ui.editEdges.checked);
   ui.margins.hidden = !ui.editEdges.checked;
   draw();
