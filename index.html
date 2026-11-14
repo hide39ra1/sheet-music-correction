@@ -150,6 +150,7 @@ PDFをここにドラッグ＆ドロップ
 <dt><kbd>R</kbd></dt><dd>180°回転を切り替え</dd>
 <dt><kbd>G</kbd></dt><dd>水平ガイドを切り替え</dd>
 <dt><kbd>M</kbd></dt><dd>端の白塗り調整を開閉</dd>
+<dt><kbd>Esc</kbd></dt><dd>白塗りのドラッグを取り消す</dd>
 <dt><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></dt><dd>補正後 / 前後 / 重ね表示</dd>
 <dt><kbd>−</kbd> / <kbd>+</kbd></dt><dd>縮小 / 拡大</dd>
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
@@ -778,9 +779,12 @@ try {
 } catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && drag) {
-    event.preventDefault();
-    cancelEdgeDrag();
+  if (drag) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') event.preventDefault();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEdgeDrag();
+    }
     return;
   }
   if (event.defaultPrevented || event.isComposing || event.altKey || ui.shortcuts.open) return;
