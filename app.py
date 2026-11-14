@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 FORMATS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG",
            ".tif": "TIFF", ".tiff": "TIFF", ".bmp": "BMP", ".webp": "WEBP"}
@@ -19,7 +19,9 @@ FORMATS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG",
 def detect(image):
     gray = np.asarray(image.convert("L"))
     scale = min(1, 1200 / max(gray.shape))
-    gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    height, width = gray.shape
+    size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    gray = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
     edges = cv2.Canny(gray, 60, 160)
     width = gray.shape[1]
     lines = cv2.HoughLinesP(edges, 1, np.pi / 720, 65,
@@ -145,13 +147,18 @@ def write_pdf(output, pages):
 
 
 def rgb(path):
-    with Image.open(path) as image:
-        if image.n_frames != 1:
-            raise ValueError("複数フレームの画像には対応していません")
-        rgba = image.convert("RGBA")
-        result = Image.new("RGB", image.size, "white")
-        result.paste(rgba, mask=rgba.getchannel("A"))
-        return result
+    try:
+        with Image.open(path) as image:
+            if image.n_frames != 1:
+                raise ValueError("複数フレームの画像には対応していません")
+            rgba = image.convert("RGBA")
+            result = Image.new("RGB", image.size, "white")
+            result.paste(rgba, mask=rgba.getchannel("A"))
+            return result
+    except Image.DecompressionBombError as exc:
+        raise ValueError("画像の解像度が大きすぎます。縮小した画像を開いてください。") from exc
+    except UnidentifiedImageError as exc:
+        raise ValueError("画像を読み取れませんでした。元の画像が開けるか確認してください。") from exc
 
 
 class Server(BaseHTTPRequestHandler):
