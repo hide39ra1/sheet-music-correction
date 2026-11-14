@@ -20,6 +20,8 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
 #margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
 #margins p{margin:0;font-size:13px}
+#shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
+#shortcuts::backdrop{background:#10291e88}#shortcuts h2{margin-top:0}#shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:8px 20px}#shortcuts dd{margin:0}#help{color:#18352d}
 #handles.editing{touch-action:none;cursor:crosshair}
 @media(max-width:1050px){#workspace{grid-template-columns:155px minmax(0,1fr)}.panel{grid-column:2}}
 @media(max-width:700px){header{padding:10px 12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}aside{max-height:160px}}
@@ -29,6 +31,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <label class="pick">PDFを選ぶ<input id="pdf" type="file" accept=".pdf"></label>
 <label class="pick">画像フォルダを選ぶ<input id="folder" type="file" webkitdirectory multiple></label>
 <button id="save" class="primary" disabled>補正結果を保存</button>
+<button id="help" aria-keyshortcuts="Shift+/" aria-haspopup="dialog">キー操作</button>
 </div>
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
 <progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
@@ -91,6 +94,20 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 
 </div></section>
 </main>
+<dialog id="shortcuts" aria-labelledby="shortcutTitle">
+<h2 id="shortcutTitle">キー操作</h2>
+<dl>
+<dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>前 / 次のページ</dd>
+<dt><kbd>[</kbd> / <kbd>]</kbd></dt><dd>角度を −0.1° / +0.1°</dd>
+<dt><kbd>R</kbd></dt><dd>180°回転を切り替え</dd>
+<dt><kbd>G</kbd></dt><dd>水平ガイドを切り替え</dd>
+<dt><kbd>M</kbd></dt><dd>端の白塗り調整を開閉</dd>
+<dt><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></dt><dd>補正後 / 前後 / 重ね表示</dd>
+<dt><kbd>−</kbd> / <kbd>+</kbd></dt><dd>縮小 / 拡大</dd>
+<dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
+</dl>
+<form method="dialog"><button autofocus>閉じる</button></form>
+</dialog>
 <script>
 const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e => [e.id,e]));
 const collator = new Intl.Collator('ja', {numeric:true});
@@ -428,5 +445,44 @@ ui.even.onclick = () => { pages.forEach((p,i) => {
   if (p.flip === (i % 2 === 1)) return;
   p.flip = i % 2 === 1; delete p.thumbnail;
 }); select(active); };
+ui.help.onclick = () => ui.shortcuts.showModal();
+document.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey ||
+      event.altKey || ui.shortcuts.open ||
+      event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+
+  const key = event.key.toLowerCase();
+  if (key === '?') {
+    event.preventDefault();
+    if (!event.repeat) ui.help.click();
+    return;
+  }
+  if (!pages.length) return;
+
+  const modes = ['after','split','overlay'];
+  switch (key) {
+    case 'arrowleft': ui.prev.click(); break;
+    case 'arrowright': ui.next.click(); break;
+    case '[': ui.less.click(); break;
+    case ']': ui.more.click(); break;
+    case 'r': if (!event.repeat) ui.flip.click(); break;
+    case 'g': if (!event.repeat) ui.guide.click(); break;
+    case 'm': if (!event.repeat) ui.editEdges.click(); break;
+    case '1':
+    case '2':
+    case '3':
+      ui.mode.value = modes[Number(key)-1];
+      ui.mode.onchange();
+      break;
+    case '-':
+    case '+':
+      ui.zoom.selectedIndex = Math.max(0,Math.min(ui.zoom.length-1,
+        ui.zoom.selectedIndex + (key === '+' ? 1 : -1)));
+      ui.zoom.onchange();
+      break;
+    default: return;
+  }
+  event.preventDefault();
+});
 </script>
 </html>
