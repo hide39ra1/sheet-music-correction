@@ -117,6 +117,7 @@ PDFをここにドラッグ＆ドロップ
 <option value="none">なし</option>
 </select></label>
 <button id="even">適用</button>
+<button id="undoRotation" disabled>一括回転を元に戻す</button>
 </div>
 
 </div></section>
@@ -142,6 +143,7 @@ const collator = new Intl.Collator('ja', {numeric:true});
 const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
 let sources = [], pages = [], active = 0, isPdf = false, ready = false;
 let dirty = false;
+let rotationUndo;
 function warnBeforeLeaving(event) {
   event.preventDefault();
   event.returnValue = true;
@@ -192,6 +194,7 @@ async function* analysisRecords(response) {
   }
 }
 function busy(value) {
+  ui.undoRotation.disabled = value || !rotationUndo;
   ui.even.disabled = value || !ready;
   ui.pdf.disabled = ui.folder.disabled = value;
   ui.save.disabled = value || !ready;
@@ -251,6 +254,7 @@ async function load(files, pdf) {
       }
     }
     ready = true;
+    rotationUndo = undefined;
     ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。';
   } catch (error) {
     ({sources,pages,active,isPdf,ready} = previous);
@@ -563,12 +567,26 @@ ui.even.onclick = () => {
   const pattern = ui.rotationPattern.value;
   const changes = pages.filter((page,index) => page.flip !== rotationForPage(pattern,index));
   if (!changes.length || !confirm(changes.length + 'ページの180°回転設定を変更しますか？')) return;
+  rotationUndo = pages.map((page,index) => ({page, before:page.flip, after:rotationForPage(pattern,index)}))
+    .filter(({before,after}) => before !== after);
+  ui.undoRotation.disabled = false;
   pages.forEach((page,index) => {
     const flip = rotationForPage(pattern,index);
     if (page.flip === flip) return;
     page.flip = flip;
     delete page.thumbnail;
   });
+  setDirty(true);
+  select(active);
+};
+ui.undoRotation.onclick = () => {
+  for (const {page,before,after} of rotationUndo) {
+    if (page.flip !== after) continue;
+    page.flip = before;
+    delete page.thumbnail;
+  }
+  rotationUndo = undefined;
+  ui.undoRotation.disabled = true;
   setDirty(true);
   select(active);
 };
