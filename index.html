@@ -672,6 +672,7 @@ ui.nextUndetected.onclick = () => {
   if (index !== -1) select(index);
 };
 ui.mode.onchange = () => {
+  savePreviewPreferences();
   ui.views.dataset.mode = ui.mode.value;
   ui.opacityControl.hidden = ui.mode.value !== 'overlay';
   ui.caption.textContent = ui.mode.value === 'overlay' ? '重ねて比較' : '補正後';
@@ -692,7 +693,12 @@ function nudge(delta) {
 }
 ui.less.onclick = () => nudge(-0.1);
 ui.more.onclick = () => nudge(0.1);
-ui.guide.onchange = draw;
+function savePreviewPreferences() {
+  try {
+    localStorage.setItem('score-preview', JSON.stringify({mode:ui.mode.value,guide:ui.guide.checked}));
+  } catch {}
+}
+ui.guide.onchange = () => { savePreviewPreferences(); draw(); };
 ui.zoom.onchange = () => {
   const box = ui.comparison;
   const x = (box.scrollLeft + box.clientWidth/2) / ui.views.offsetWidth;
@@ -739,6 +745,15 @@ ui.undoRotation.onclick = () => {
   setDirty(true);
   select(active);
 };
+try {
+  const preferences = JSON.parse(localStorage.getItem('score-preview'));
+  if (['after','split','overlay'].includes(preferences?.mode)) {
+    ui.mode.value = ui.views.dataset.mode = preferences.mode;
+    ui.opacityControl.hidden = preferences.mode !== 'overlay';
+    ui.caption.textContent = preferences.mode === 'overlay' ? '重ねて比較' : '補正後';
+  }
+  ui.guide.checked = preferences?.guide === true;
+} catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
   if (event.defaultPrevented || event.isComposing || event.altKey || ui.shortcuts.open) return;
