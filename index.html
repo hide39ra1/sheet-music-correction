@@ -17,6 +17,9 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .views[data-mode=after] #original,.views[data-mode=overlay] #original{display:none}
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
+.viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
+#margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
+#margins p{margin:0;font-size:13px}
 #handles.editing{touch-action:none;cursor:crosshair}
 @media(max-width:1050px){#workspace{grid-template-columns:155px minmax(0,1fr)}.panel{grid-column:2}}
 @media(max-width:700px){header{padding:10px 12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}aside{max-height:160px}}
@@ -33,10 +36,14 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <main>
 <section id="workspace" hidden>
 <aside aria-label="ページ一覧">
-<label><input id="review" type="checkbox"> 要確認のみ</label>
+<label><input id="review" type="checkbox"> 未確認のみ</label>
 <div id="pages"></div>
 </aside>
 <div class="card viewer">
+<nav class="actions" aria-label="ページ送り">
+<button id="prev">前へ</button><span id="position"></span><button id="next">次へ</button>
+<button id="checked">確認済みにする</button>
+</nav>
 <div class="actions">
 <label>表示 <select id="mode">
 <option value="after">補正後</option>
@@ -49,8 +56,19 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <option value="1">全体</option><option value="1.5">150%</option>
 <option value="2">200%</option><option value="3">300%</option>
 </select></label>
-<label><input id="editEdges" type="checkbox"> 白塗り境界をドラッグ</label>
+<label><input id="editEdges" type="checkbox"> 端の白塗りを調整</label>
 </div>
+<fieldset id="margins" hidden>
+<legend>表示向きで画像の端を白くする（%）</legend>
+<div class="actions">
+<label>上 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>右 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>下 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<p>青い線をドラッグするか、幅を入力してください。</p>
+<button id="applyMargins">この幅を全ページに適用</button>
+</div>
+</fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
 <div class="views" id="views" data-mode="after">
 <figure id="original"><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
@@ -72,16 +90,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
 <button id="even">全ページを奇数正常・偶数反転に戻す</button>
 </div>
-<fieldset id="margins">
-<legend>表示向きで画像の端を白くする（%）</legend>
-<div class="actions">
-<label>上 <input type="number" min="0" max="20" step="0.1" value="0"></label>
-<label>右 <input type="number" min="0" max="20" step="0.1" value="0"></label>
-<label>下 <input type="number" min="0" max="20" step="0.1" value="0"></label>
-<label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
-<button id="applyMargins">この幅を全ページに適用</button>
-</div>
-</fieldset>
+
 </div></section>
 </main>
 <script>
@@ -124,6 +133,7 @@ async function* analysisRecords(response) {
 function busy(value) {
   ui.pdf.disabled = ui.folder.disabled = value;
   ui.save.disabled = value || !ready;
+  ui.applyMargins.disabled = value || !ready;
 }
 async function load(files, pdf) {
   if (!files.length) return;
@@ -159,7 +169,7 @@ async function load(files, pdf) {
         image.src = 'data:image/jpeg;base64,' + info.preview;
         await image.decode();
         const index = result.length;
-        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
+        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0], checked:false,
           name:pdf ? (index+1) + 'ページ' : path(file)});
         showProgress();
         if (index === 0) { ui.workspace.hidden = false; select(0); }
@@ -180,22 +190,25 @@ async function load(files, pdf) {
 }
 function renderPages() {
   const entries = pages.flatMap((page,index) => {
-    if (ui.review.checked && page.detected !== null) return [];
+    if (ui.review.checked && page.checked) return [];
     const button = document.createElement('button');
     button.className = 'page-button';
     button.setAttribute('aria-current', index === active);
     const thumb = document.createElement('img');
-    thumb.src = page.image.src; thumb.alt = ''; thumb.loading = 'lazy';
-    thumb.style.transform = page.flip ? 'rotate(180deg)' : '';
+    thumb.src = page.thumbnail ??= thumbnail(page); thumb.alt = ''; thumb.loading = 'lazy';
     const text = document.createElement('span');
     text.textContent = page.name;
     const badges = document.createElement('small');
-    badges.textContent = [page.flip && '180°', page.detected === null && '要確認'].filter(Boolean).join(' · ');
+    badges.textContent = [page.flip && '180°', page.checked ? '確認済み' : page.detected === null ? '傾き要確認' : '未確認'].filter(Boolean).join(' · ');
     text.append(badges); button.append(thumb,text);
     button.onclick = () => select(index);
     return [button];
   });
-  ui.pages.replaceChildren(...(entries.length ? entries : ['要確認のページはありません']));
+  ui.prev.disabled = nextIndex(-1) === -1;
+  ui.next.disabled = nextIndex(1) === -1;
+  ui.position.textContent = (active+1) + ' / ' + pages.length + 'ページ';
+  ui.checked.textContent = pages[active].checked ? '未確認に戻す' : '確認済みにする';
+  ui.pages.replaceChildren(...(entries.length ? entries : ['未確認のページはありません']));
 }
 function orientedMargins(page) {
   const [top,right,bottom,left] = page.margins;
@@ -204,6 +217,7 @@ function orientedMargins(page) {
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
   drag = null;
+  if (active !== index) ui.comparison.scrollTo(0,0);
   active = index;
   const page = pages[index];
   renderPages();
@@ -215,30 +229,54 @@ function select(index) {
     : '検出した補正角度 ' + page.detected.toFixed(2) + '°';
   draw();
 }
+function paint(canvas,page,w,h) {
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'white'; ctx.fillRect(0,0,w,h);
+  ctx.translate(w/2,h/2);
+  const rad = -page.angle * Math.PI / 180;
+  if (ui.fit.checked) {
+    const c = Math.abs(Math.cos(rad)), s = Math.abs(Math.sin(rad));
+    const scale = Math.min(w/(w*c+h*s),h/(w*s+h*c),1);
+    ctx.scale(scale,scale);
+  }
+  ctx.rotate(rad + (page.flip ? Math.PI : 0));
+  ctx.drawImage(page.image,-w/2,-h/2,w,h);
+  const [top,right,bottom,left] = page.margins.map((value,i) => value*(i%2 ? w : h)/100);
+  ctx.fillRect(-w/2,-h/2,w,top);
+  ctx.fillRect(w/2-right,-h/2,right,h);
+  ctx.fillRect(-w/2,h/2-bottom,w,bottom);
+  ctx.fillRect(-w/2,-h/2,left,h);
+  return ctx;
+}
+function thumbnail(page) {
+  const canvas = document.createElement('canvas');
+  paint(canvas,page,80,Math.max(1,Math.round(page.image.height*80/page.image.width)));
+  return canvas.toDataURL('image/jpeg',0.8);
+}
+function nextIndex(step) {
+  for (let i = active + step; i >= 0 && i < pages.length; i += step) {
+    if (!ui.review.checked || !pages[i].checked) return i;
+  }
+  return -1;
+}
+function changed(page = pages[active]) {
+  page.checked = false;
+  delete page.thumbnail;
+  renderPages();
+  draw();
+}
 function draw() {
-  const {image,angle,flip,margins} = pages[active];
-  const w = image.width, h = image.height, rad = -angle * Math.PI / 180;
+  const page = pages[active], {image} = page;
+  const w = image.width, h = image.height;
   let transform;
   for (const canvas of [ui.before,ui.after]) {
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'white'; ctx.fillRect(0,0,w,h);
-    ctx.translate(w/2,h/2);
-    if (canvas === ui.after) {
-      if (ui.fit.checked) {
-        const c = Math.abs(Math.cos(rad)), s = Math.abs(Math.sin(rad));
-        const scale = Math.min(w/(w*c+h*s), h/(w*s+h*c), 1);
-        ctx.scale(scale,scale);
-      }
-      ctx.rotate(rad + (flip ? Math.PI : 0));
-    }
-    ctx.drawImage(image,-w/2,-h/2);
-    if (canvas === ui.after) {
-      const [top,right,bottom,left] = margins.map((value,i) => Math.round(value * (i % 2 ? w : h) / 100));
-      ctx.fillRect(-w/2,-h/2,w,top);
-      ctx.fillRect(w/2-right,-h/2,right,h);
-      ctx.fillRect(-w/2,h/2-bottom,w,bottom);
-      ctx.fillRect(-w/2,-h/2,left,h);
+    let ctx;
+    if (canvas === ui.after) ctx = paint(canvas,page,w,h);
+    else {
+      canvas.width = w; canvas.height = h;
+      ctx = canvas.getContext('2d');
+      ctx.drawImage(image,0,0);
     }
     if (canvas === ui.after) {
       transform = ctx.getTransform();
@@ -301,7 +339,7 @@ ui.handles.onpointermove = event => {
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
   draw();
 };
-ui.handles.onlostpointercapture = () => { drag = null; };
+ui.handles.onlostpointercapture = () => { if (drag) changed(); drag = null; };
 
 function download(blob,name) {
   const url = URL.createObjectURL(blob);
@@ -340,28 +378,49 @@ ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
 ui.folder.onchange = () => load(Array.from(ui.folder.files),false);
 ui.angle.oninput = () => {
   if (ui.angle.value !== '' && ui.angle.validity.rangeOverflow === false && ui.angle.validity.rangeUnderflow === false) {
-    pages[active].angle = ui.angle.valueAsNumber; draw();
+    pages[active].angle = ui.angle.valueAsNumber; changed();
   }
 };
 ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
-ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; select(active); };
-ui.fit.onchange = draw;
+ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; changed(); select(active); };
+ui.fit.onchange = () => {
+  pages.forEach(page => { page.checked = false; delete page.thumbnail; });
+  renderPages(); draw();
+};
 marginInputs.forEach((input,i) => {
   input.oninput = () => {
     if (!Number.isFinite(input.valueAsNumber) || input.validity.rangeUnderflow || input.validity.rangeOverflow) return;
     const page = pages[active];
     page.margins[marginIndex(i,page)] = input.valueAsNumber;
-    draw();
+    changed();
   };
   input.onchange = () => { input.value = orientedMargins(pages[active])[i]; };
 });
 ui.applyMargins.onclick = () => {
+  if (!ready || !confirm('全ページ（' + pages.length + 'ページ）の白塗り幅を上書きしますか？')) return;
   const margins = orientedMargins(pages[active]);
-  pages.forEach(page => { page.margins = margins.map((_,i) => margins[marginIndex(i,page)]); });
+  pages.forEach(page => {
+    const next = margins.map((_,i) => margins[marginIndex(i,page)]);
+    if (next.every((value,i) => value === page.margins[i])) return;
+    page.margins = next; page.checked = false; delete page.thumbnail;
+  });
+  renderPages();
+};
+ui.prev.onclick = () => select(nextIndex(-1));
+ui.next.onclick = () => select(nextIndex(1));
+ui.checked.onclick = () => {
+  const page = pages[active];
+  page.checked = !page.checked;
+  if (ui.review.checked && page.checked) {
+    const next = nextIndex(1);
+    const previous = nextIndex(-1);
+    if (next !== -1 || previous !== -1) { select(next !== -1 ? next : previous); return; }
+  }
+  renderPages();
 };
 ui.review.onchange = () => {
-  const first = pages.findIndex(page => page.detected === null);
-  if (ui.review.checked && first !== -1 && pages[active].detected !== null) select(first);
+  const first = pages.findIndex(page => !page.checked);
+  if (ui.review.checked && first !== -1 && pages[active].checked) select(first);
   else renderPages();
 };
 ui.mode.onchange = () => {
@@ -373,24 +432,34 @@ ui.mode.onchange = () => {
 ui.opacity.oninput = draw;
 ui.editEdges.onchange = () => {
   ui.handles.classList.toggle('editing',ui.editEdges.checked);
+  ui.margins.hidden = !ui.editEdges.checked;
   draw();
 };
 function nudge(delta) {
   const page = pages[active];
   page.angle = Math.round(Math.min(15,Math.max(-15,page.angle + delta))*100)/100;
   ui.angle.value = page.angle;
-  draw();
+  changed();
 }
 ui.less.onclick = () => nudge(-0.1);
 ui.more.onclick = () => nudge(0.1);
 ui.guide.onchange = draw;
-ui.zoom.onchange = () => { ui.views.style.width = Number(ui.zoom.value) * 100 + '%'; };
+ui.zoom.onchange = () => {
+  const box = ui.comparison;
+  const x = (box.scrollLeft + box.clientWidth/2) / ui.views.offsetWidth;
+  const y = (box.scrollTop + box.clientHeight/2) / ui.views.offsetHeight;
+  ui.views.style.width = Number(ui.zoom.value) * 100 + '%';
+  box.scrollTo(x*ui.views.offsetWidth-box.clientWidth/2,y*ui.views.offsetHeight-box.clientHeight/2);
+};
 ui.reset.onclick = () => {
   pages[active].angle = pages[active].detected ?? 0;
   pages[active].flip = active % 2 === 1;
   pages[active].margins = [0,0,0,0];
-  select(active);
+  changed(); select(active);
 };
-ui.even.onclick = () => { pages.forEach((p,i) => p.flip = i % 2 === 1); select(active); };
+ui.even.onclick = () => { pages.forEach((p,i) => {
+  if (p.flip === (i % 2 === 1)) return;
+  p.flip = i % 2 === 1; p.checked = false; delete p.thumbnail;
+}); select(active); };
 </script>
 </html>
