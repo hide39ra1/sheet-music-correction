@@ -110,7 +110,13 @@ PDFをここにドラッグ＆ドロップ
 <p id="detection"></p>
 <div class="actions">
 <label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
-<button id="even">全ページを奇数正常・偶数反転に戻す</button>
+<label>一括180°回転 <select id="rotationPattern">
+<option value="even">偶数ページ</option>
+<option value="odd">奇数ページ</option>
+<option value="all">すべて</option>
+<option value="none">なし</option>
+</select></label>
+<button id="even">適用</button>
 </div>
 
 </div></section>
@@ -186,6 +192,7 @@ async function* analysisRecords(response) {
   }
 }
 function busy(value) {
+  ui.even.disabled = value || !ready;
   ui.pdf.disabled = ui.folder.disabled = value;
   ui.save.disabled = value || !ready;
   ui.applyMargins.disabled = value || !ready;
@@ -548,10 +555,23 @@ ui.reset.onclick = () => {
   pages[active].margins = [0,0,0,0];
   changed(); select(active);
 };
-ui.even.onclick = () => { pages.forEach((p,i) => {
-  if (p.flip === (i % 2 === 1)) return;
-  p.flip = i % 2 === 1; delete p.thumbnail; setDirty(true);
-}); select(active); };
+function rotationForPage(pattern,index) {
+  return pattern === 'all' || (pattern === 'even' && index % 2 === 1) ||
+    (pattern === 'odd' && index % 2 === 0);
+}
+ui.even.onclick = () => {
+  const pattern = ui.rotationPattern.value;
+  const changes = pages.filter((page,index) => page.flip !== rotationForPage(pattern,index));
+  if (!changes.length || !confirm(changes.length + 'ページの180°回転設定を変更しますか？')) return;
+  pages.forEach((page,index) => {
+    const flip = rotationForPage(pattern,index);
+    if (page.flip === flip) return;
+    page.flip = flip;
+    delete page.thumbnail;
+  });
+  setDirty(true);
+  select(active);
+};
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
   if (event.defaultPrevented || event.isComposing || event.altKey || ui.shortcuts.open) return;
