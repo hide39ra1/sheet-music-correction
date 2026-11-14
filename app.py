@@ -89,18 +89,24 @@ def pdf_dimensions(source):
     return dimensions
 
 
-def pdf_pages(source, folder, dimensions):
+def pdf_rasters(source, folder, count, *render_options, first_batch=8):
     batch_size = 8
-    for start in range(0, len(dimensions), batch_size):
-        batch = dimensions[start:start + batch_size]
-        poppler("pdftoppm", "-f", str(start + 1), "-l", str(start + len(batch)),
-                "-cropbox", "-r", "300", "-png", str(source), str(folder / "page"))
+    start = 0
+    while start < count:
+        end = min(start + (batch_size if start else first_batch), count)
+        poppler("pdftoppm", "-f", str(start + 1), "-l", str(end),
+                "-cropbox", *render_options, "-png", str(source), str(folder / "page"))
         paths = sorted(folder.glob("page-*.png"))
-        if len(paths) != len(batch):
+        if len(paths) != end - start:
             raise ValueError("PDFの一部を読み込めませんでした")
-        for path, size in zip(paths, batch):
-            yield path, size
+        for path in paths:
+            yield path
             path.unlink()
+        start = end
+
+
+def pdf_pages(source, folder, dimensions):
+    return zip(pdf_rasters(source, folder, len(dimensions), "-r", "300"), dimensions)
 
 
 def pdf_page_count(source):
@@ -278,14 +284,8 @@ class Server(BaseHTTPRequestHandler):
 
         try:
             send({"total": count})
-            for number in range(1, count + 1):
-                path = source
-                if pdf:
-                    prefix = folder / "preview"
-                    poppler("pdftoppm", "-f", str(number), "-l", str(number),
-                            "-singlefile", "-cropbox", "-scale-to", "1400", "-png",
-                            str(source), str(prefix))
-                    path = prefix.with_suffix(".png")
+            paths = pdf_rasters(source, folder, count, "-scale-to", "1400", first_batch=1) if pdf else [source]
+            for path in paths:
                 image = rgb(path)
                 angle = detect(image)
                 image.thumbnail((800, 1050))
