@@ -19,6 +19,9 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
 .viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
 #documentName{margin:0 0 10px;font-size:14px;overflow-wrap:anywhere}
+#pdfNameOptions{margin:0 0 10px;font-size:13px}
+#pdfNameOptions input{font:inherit;width:min(26ch,65%);padding:4px}
+#pdfNameOptions summary{cursor:pointer;color:#235745}
 #margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
 #margins p{margin:0;font-size:13px}
 #shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
@@ -61,7 +64,7 @@ PDFをここにドラッグ＆ドロップ
 <div class="card viewer">
 <h2 id="documentName"></h2>
 <details id="pdfNameOptions" hidden>
-<summary>保存ファイル名</summary>
+<summary id="pdfNameSummary">保存ファイル名</summary>
 <label>ファイル名 <input id="pdfName" type="text" maxlength="180"> .pdf</label>
 </details>
 <nav class="actions" aria-label="ページ送り">
@@ -322,6 +325,7 @@ function orientedMargins(page) {
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
   ui.pdfNameOptions.hidden = !isPdf;
+  updatePdfName();
   ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
   ui.pageNumber.value = index + 1;
   drag = null;
@@ -456,8 +460,7 @@ ui.save.onclick = async () => {
     if (isPdf) {
       ui.status.textContent = 'PDFを書き出しています…';
       const file = sources[0];
-      const name = ui.pdfName.value.trim().replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_').replace(/[. ]+$/,'');
-      download(await (await api('/export',file,settings)).blob(), name ? name + '.pdf' : file.name.replace(/\.pdf$/i,'-補正.pdf'));
+      download(await (await api('/export',file,settings)).blob(), exportPdfName(file));
     } else {
       if (!window.showDirectoryPicker) throw new Error('フォルダへの保存には Microsoft Edge または Google Chrome を使用してください。');
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
@@ -484,6 +487,17 @@ ui.save.onclick = async () => {
   }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
+function exportPdfName(file) {
+  const name = ui.pdfName.value.trim().replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_').replace(/[. ]+$/,'');
+  return name ? name + '.pdf' : file.name.replace(/\.pdf$/i,'-補正.pdf');
+}
+function updatePdfName() {
+  if (!isPdf) return;
+  const name = exportPdfName(sources[0]);
+  ui.pdfNameSummary.title = name;
+  ui.pdfNameSummary.textContent = '保存ファイル名 · ' + (name.length > 32 ? name.slice(0,28) + '…' : name);
+}
+ui.pdfName.oninput = updatePdfName;
 ui.cancelLoad.onclick = () => loading?.abort();
 function isFileDrag(event) {
   return event.dataTransfer.types.includes('Files');
