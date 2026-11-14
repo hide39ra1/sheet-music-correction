@@ -472,7 +472,8 @@ ui.handles.onpointerdown = event => {
   const errors = distances.map((distance,i) => Math.abs(distance-Math.max(0.6,pages[active].margins[i])));
   const distance = Math.min(...errors);
   if (distance > 5) return;
-  drag = {edge:errors.indexOf(distance), pointer:event.pointerId};
+  const edge = errors.indexOf(distance);
+  drag = {edge, pointer:event.pointerId, original:pages[active].margins[edge]};
   ui.handles.setPointerCapture(event.pointerId);
 };
 ui.handles.onpointermove = event => {
@@ -483,7 +484,22 @@ ui.handles.onpointermove = event => {
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
   draw();
 };
-ui.handles.onlostpointercapture = () => { if (drag) changed(); drag = null; };
+ui.handles.onlostpointercapture = () => {
+  if (drag && pages[active].margins[drag.edge] !== drag.original) changed();
+  drag = null;
+};
+function cancelEdgeDrag() {
+  const {edge,pointer,original} = drag;
+  drag = null;
+  const page = pages[active];
+  page.margins[edge] = original;
+  marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
+  if (ui.handles.hasPointerCapture(pointer)) ui.handles.releasePointerCapture(pointer);
+  draw();
+}
+ui.handles.onpointercancel = event => {
+  if (drag?.pointer === event.pointerId) cancelEdgeDrag();
+};
 
 async function receivePdf(response) {
   const total = Number(response.headers.get('Content-Length'));
@@ -762,6 +778,11 @@ try {
 } catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && drag) {
+    event.preventDefault();
+    cancelEdgeDrag();
+    return;
+  }
   if (event.defaultPrevented || event.isComposing || event.altKey || ui.shortcuts.open) return;
   const key = event.key.toLowerCase();
   if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 's' && pages.length) {
