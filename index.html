@@ -89,6 +89,7 @@ PDFをここにドラッグ＆ドロップ
 <label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <p>画像の端付近を内側へドラッグするか、幅を入力してください。</p>
 <button id="applyMargins">この幅を全ページに適用</button>
+<button id="undoMargins" disabled>一括白塗りを元に戻す</button>
 </div>
 </fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
@@ -144,6 +145,7 @@ const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
 let sources = [], pages = [], active = 0, isPdf = false, ready = false;
 let dirty = false;
 let rotationUndo;
+let marginUndo;
 function warnBeforeLeaving(event) {
   event.preventDefault();
   event.returnValue = true;
@@ -195,6 +197,7 @@ async function* analysisRecords(response) {
 }
 function busy(value) {
   ui.undoRotation.disabled = value || !rotationUndo;
+  ui.undoMargins.disabled = value || !marginUndo;
   ui.even.disabled = value || !ready;
   ui.pdf.disabled = ui.folder.disabled = value;
   ui.save.disabled = value || !ready;
@@ -255,6 +258,7 @@ async function load(files, pdf) {
     }
     ready = true;
     rotationUndo = undefined;
+    marginUndo = undefined;
     ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。';
   } catch (error) {
     ({sources,pages,active,isPdf,ready} = previous);
@@ -508,14 +512,28 @@ marginInputs.forEach((input,i) => {
   input.onchange = () => { input.value = orientedMargins(pages[active])[i]; };
 });
 ui.applyMargins.onclick = () => {
-  if (!ready || !confirm('全ページ（' + pages.length + 'ページ）の白塗り幅を上書きしますか？')) return;
   const margins = orientedMargins(pages[active]);
-  pages.forEach(page => {
-    const next = margins.map((_,i) => margins[marginIndex(i,page)]);
-    if (next.every((value,i) => value === page.margins[i])) return;
-    page.margins = next; delete page.thumbnail; setDirty(true);
-  });
-  renderPages();
+  const edits = pages.map(page => ({
+    page, before:[...page.margins], after:margins.map((_,i) => margins[marginIndex(i,page)])
+  })).filter(({before,after}) => before.some((value,i) => value !== after[i]));
+  if (!ready || !edits.length || !confirm(edits.length + 'ページの白塗り幅を変更しますか？')) return;
+  marginUndo = edits;
+  for (const {page,after} of edits) {
+    page.margins = [...after];
+    delete page.thumbnail;
+  }
+  ui.undoMargins.disabled = false;
+  changed();
+};
+ui.undoMargins.onclick = () => {
+  for (const {page,before,after} of marginUndo) {
+    page.margins = page.margins.map((value,i) => value === after[i] ? before[i] : value);
+    delete page.thumbnail;
+  }
+  marginUndo = undefined;
+  ui.undoMargins.disabled = true;
+  setDirty(true);
+  select(active);
 };
 ui.prev.onclick = () => select(nextIndex(-1));
 ui.jump.onsubmit = event => {
