@@ -39,7 +39,7 @@ main{padding:14px 20px}
 <div class="bar"><h1>譜面補正</h1>
 <label class="pick">PDFを選ぶ<input id="pdf" type="file" accept=".pdf"></label>
 <label class="pick">画像フォルダを選ぶ<input id="folder" type="file" webkitdirectory multiple></label>
-<button id="save" class="primary" disabled>補正結果を保存</button>
+<button id="save" class="primary" aria-keyshortcuts="Control+s Meta+s" disabled>補正結果を保存</button>
 <button id="help" aria-keyshortcuts="Shift+/" aria-haspopup="dialog">キー操作</button>
 </div>
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
@@ -123,6 +123,7 @@ PDFをここにドラッグ＆ドロップ
 <dt><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></dt><dd>補正後 / 前後 / 重ね表示</dd>
 <dt><kbd>−</kbd> / <kbd>+</kbd></dt><dd>縮小 / 拡大</dd>
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
+<dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>補正結果を保存</dd>
 </dl>
 <form method="dialog"><button autofocus>閉じる</button></form>
 </dialog>
@@ -516,11 +517,16 @@ ui.even.onclick = () => { pages.forEach((p,i) => {
 }); select(active); };
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
-  if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey ||
-      event.altKey || ui.shortcuts.open ||
+  if (event.defaultPrevented || event.isComposing || event.altKey || ui.shortcuts.open) return;
+  const key = event.key.toLowerCase();
+  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 's' && pages.length) {
+    event.preventDefault();
+    if (!event.repeat && !ui.save.disabled) ui.save.click();
+    return;
+  }
+  if (event.ctrlKey || event.metaKey ||
       event.target.closest?.('input, select, textarea, [contenteditable]')) return;
 
-  const key = event.key.toLowerCase();
   if (key === '?') {
     event.preventDefault();
     if (!event.repeat) ui.help.click();
