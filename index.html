@@ -50,7 +50,7 @@ main{padding:14px 20px}
 <button id="help" aria-keyshortcuts="Shift+/" aria-haspopup="dialog">キー操作</button>
 </div>
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
-<progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
+<progress id="progress" aria-label="処理の進捗" style="width:100%;accent-color:#235745" hidden></progress>
 <button id="cancelLoad" hidden>読み込みを中止</button>
 <button id="retryLoad" hidden>読み込みを再試行</button>
 </header>
@@ -472,6 +472,22 @@ ui.handles.onpointermove = event => {
 };
 ui.handles.onlostpointercapture = () => { if (drag) changed(); drag = null; };
 
+async function receivePdf(response) {
+  const total = Number(response.headers.get('Content-Length'));
+  if (!total || !response.body) return response.blob();
+  const chunks = [];
+  let received = 0;
+  ui.progress.max = total;
+  ui.progress.value = 0;
+  for await (const chunk of response.body) {
+    chunks.push(chunk);
+    received += chunk.byteLength;
+    ui.progress.value = received;
+    ui.status.textContent = 'PDFを受信中（' + Math.floor(received * 100 / total) + '%）';
+  }
+  if (received !== total) throw new Error('PDFの受信が途中で終了しました。');
+  return new Blob(chunks,{type:'application/pdf'});
+}
 function download(blob,name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
@@ -486,7 +502,9 @@ ui.save.onclick = async () => {
     if (isPdf) {
       ui.status.textContent = 'PDFを書き出しています…';
       const file = sources[0];
-      download(await (await api('/export',file,settings)).blob(), exportPdfName(file));
+      ui.progress.removeAttribute('value');
+      ui.progress.hidden = false;
+      download(await receivePdf(await api('/export',file,settings)), exportPdfName(file));
     } else {
       if (!window.showDirectoryPicker) throw new Error('フォルダへの保存には Microsoft Edge または Google Chrome を使用してください。');
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
@@ -508,6 +526,7 @@ ui.save.onclick = async () => {
     ui.status.textContent = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
   } finally {
     ui.workspace.inert = false;
+    ui.progress.hidden = true;
     ui.save.textContent = '補正結果を保存';
     busy(false);
   }
