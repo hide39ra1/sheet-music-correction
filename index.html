@@ -36,13 +36,11 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <main>
 <section id="workspace" hidden>
 <aside aria-label="ページ一覧">
-<label><input id="review" type="checkbox"> 未確認のみ</label>
 <div id="pages"></div>
 </aside>
 <div class="card viewer">
 <nav class="actions" aria-label="ページ送り">
 <button id="prev">前へ</button><span id="position"></span><button id="next">次へ</button>
-<button id="checked">確認済みにする</button>
 </nav>
 <div class="actions">
 <label>表示 <select id="mode">
@@ -65,7 +63,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <label>右 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <label>下 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
-<p>青い線をドラッグするか、幅を入力してください。</p>
+<p>画像の端付近を内側へドラッグするか、幅を入力してください。</p>
 <button id="applyMargins">この幅を全ページに適用</button>
 </div>
 </fieldset>
@@ -138,7 +136,7 @@ function busy(value) {
 async function load(files, pdf) {
   if (!files.length) return;
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
-  ui.fit.checked = true; ui.review.checked = false;
+  ui.fit.checked = true;
   ui.progress.hidden = false;
   ui.progress.removeAttribute('value');
   ui.status.textContent = 'ファイルを読み込んでいます…';
@@ -169,7 +167,7 @@ async function load(files, pdf) {
         image.src = 'data:image/jpeg;base64,' + info.preview;
         await image.decode();
         const index = result.length;
-        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0], checked:false,
+        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
         showProgress();
         if (index === 0) { ui.workspace.hidden = false; select(0); }
@@ -190,7 +188,6 @@ async function load(files, pdf) {
 }
 function renderPages() {
   const entries = pages.flatMap((page,index) => {
-    if (ui.review.checked && page.checked) return [];
     const button = document.createElement('button');
     button.className = 'page-button';
     button.setAttribute('aria-current', index === active);
@@ -199,7 +196,7 @@ function renderPages() {
     const text = document.createElement('span');
     text.textContent = page.name;
     const badges = document.createElement('small');
-    badges.textContent = [page.flip && '180°', page.checked ? '確認済み' : page.detected === null ? '傾き要確認' : '未確認'].filter(Boolean).join(' · ');
+    badges.textContent = [page.flip && '180°', page.detected === null && '傾き要確認'].filter(Boolean).join(' · ');
     text.append(badges); button.append(thumb,text);
     button.onclick = () => select(index);
     return [button];
@@ -207,8 +204,7 @@ function renderPages() {
   ui.prev.disabled = nextIndex(-1) === -1;
   ui.next.disabled = nextIndex(1) === -1;
   ui.position.textContent = (active+1) + ' / ' + pages.length + 'ページ';
-  ui.checked.textContent = pages[active].checked ? '未確認に戻す' : '確認済みにする';
-  ui.pages.replaceChildren(...(entries.length ? entries : ['未確認のページはありません']));
+  ui.pages.replaceChildren(...entries);
 }
 function orientedMargins(page) {
   const [top,right,bottom,left] = page.margins;
@@ -255,13 +251,10 @@ function thumbnail(page) {
   return canvas.toDataURL('image/jpeg',0.8);
 }
 function nextIndex(step) {
-  for (let i = active + step; i >= 0 && i < pages.length; i += step) {
-    if (!ui.review.checked || !pages[i].checked) return i;
-  }
-  return -1;
+  const next = active + step;
+  return next >= 0 && next < pages.length ? next : -1;
 }
 function changed(page = pages[active]) {
-  page.checked = false;
   delete page.thumbnail;
   renderPages();
   draw();
@@ -300,21 +293,10 @@ function draw() {
       ctx.stroke();
     }
   }
-  drawEdges(w,h,transform);
-}
-let edgeTransform;
-function drawEdges(w,h,transform) {
   ui.handles.width = w; ui.handles.height = h;
   edgeTransform = transform.inverse();
-  if (!ui.editEdges.checked) return;
-  const ctx = ui.handles.getContext('2d');
-  ctx.setTransform(transform);
-  ctx.strokeStyle = '#087ca5'; ctx.lineWidth = 3;
-  const [top,right,bottom,left] = pages[active].margins;
-  const x1 = -w/2 + Math.max(0.6,left)*w/100, x2 = w/2 - Math.max(0.6,right)*w/100;
-  const y1 = -h/2 + Math.max(0.6,top)*h/100, y2 = h/2 - Math.max(0.6,bottom)*h/100;
-  ctx.strokeRect(x1,y1,x2-x1,y2-y1);
 }
+let edgeTransform;
 function edgeDistances(event) {
   const {width:w,height:h} = ui.handles;
   const rect = ui.handles.getBoundingClientRect();
@@ -384,7 +366,7 @@ ui.angle.oninput = () => {
 ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
 ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; changed(); select(active); };
 ui.fit.onchange = () => {
-  pages.forEach(page => { page.checked = false; delete page.thumbnail; });
+  pages.forEach(page => { delete page.thumbnail; });
   renderPages(); draw();
 };
 marginInputs.forEach((input,i) => {
@@ -402,27 +384,12 @@ ui.applyMargins.onclick = () => {
   pages.forEach(page => {
     const next = margins.map((_,i) => margins[marginIndex(i,page)]);
     if (next.every((value,i) => value === page.margins[i])) return;
-    page.margins = next; page.checked = false; delete page.thumbnail;
+    page.margins = next; delete page.thumbnail;
   });
   renderPages();
 };
 ui.prev.onclick = () => select(nextIndex(-1));
 ui.next.onclick = () => select(nextIndex(1));
-ui.checked.onclick = () => {
-  const page = pages[active];
-  page.checked = !page.checked;
-  if (ui.review.checked && page.checked) {
-    const next = nextIndex(1);
-    const previous = nextIndex(-1);
-    if (next !== -1 || previous !== -1) { select(next !== -1 ? next : previous); return; }
-  }
-  renderPages();
-};
-ui.review.onchange = () => {
-  const first = pages.findIndex(page => !page.checked);
-  if (ui.review.checked && first !== -1 && pages[active].checked) select(first);
-  else renderPages();
-};
 ui.mode.onchange = () => {
   ui.views.dataset.mode = ui.mode.value;
   ui.opacityControl.hidden = ui.mode.value !== 'overlay';
@@ -459,7 +426,7 @@ ui.reset.onclick = () => {
 };
 ui.even.onclick = () => { pages.forEach((p,i) => {
   if (p.flip === (i % 2 === 1)) return;
-  p.flip = i % 2 === 1; p.checked = false; delete p.thumbnail;
+  p.flip = i % 2 === 1; delete p.thumbnail;
 }); select(active); };
 </script>
 </html>
