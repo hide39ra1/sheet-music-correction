@@ -583,6 +583,7 @@ ui.save.onclick = async () => {
       download(await receivePdf(await api('/export',file,settings)), outputPdf);
     } else {
       if (!window.showDirectoryPicker) throw new Error('フォルダへの保存には Microsoft Edge または Google Chrome を使用してください。');
+      ui.status.textContent = '補正した画像の保存先フォルダを選んでください。';
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
       const name = path(sources[0]).split('/')[0] + '-補正-' + Date.now();
       const root = await parent.getDirectoryHandle(name,{create:true});
