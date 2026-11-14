@@ -157,8 +157,13 @@ class Server(BaseHTTPRequestHandler):
             return
         try:
             self.process()
+        except ConnectionError:
+            return
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
-            self.reply(json.dumps({"error": str(exc)}).encode(), "application/json", 400)
+            try:
+                self.reply(json.dumps({"error": str(exc)}).encode(), "application/json", 400)
+            except ConnectionError:
+                return
 
     def process(self):
         import base64
