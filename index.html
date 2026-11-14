@@ -18,7 +18,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
 .viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
-#documentName{margin:0 0 10px;font-size:14px;overflow-wrap:anywhere}
+#documentName{margin:0 0 10px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pdfNameOptions{margin:0 0 10px;font-size:13px}
 #pdfNameOptions input{font:inherit;width:min(26ch,65%);padding:4px}
 #pdfNameOptions summary{cursor:pointer;color:#235745}
@@ -362,6 +362,7 @@ function select(index) {
   ui.pdfNameOptions.hidden = !isPdf;
   updatePdfName();
   ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
+  ui.documentName.title = ui.documentName.textContent;
   ui.pageNumber.value = index + 1;
   drag = null;
   if (active !== index) ui.comparison.scrollTo(0,0);
