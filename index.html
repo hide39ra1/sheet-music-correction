@@ -375,7 +375,9 @@ function renderPages() {
     const [text,badges] = label.children;
     const src = page.thumbnail ??= thumbnail(page);
     if (thumb.src !== src) thumb.src = src;
-    if (text.textContent !== page.name) text.textContent = page.name;
+    const labelText = isPdf ? page.name : (index + 1) + ' · ' + page.name.split('/').at(-1);
+    if (text.textContent !== labelText) text.textContent = labelText;
+    button.title = page.name;
     badges.textContent = [page.flip && '180°', page.detected === null && '傾き要確認'].filter(Boolean).join(' · ');
   });
   ui.prev.disabled = nextIndex(-1) === -1;
