@@ -169,7 +169,7 @@ PDFをここにドラッグ＆ドロップ
 <dt><kbd>R</kbd></dt><dd>180°回転を切り替え</dd>
 <dt><kbd>G</kbd></dt><dd>水平ガイドを切り替え</dd>
 <dt><kbd>M</kbd></dt><dd>端の白塗り調整を開閉</dd>
-<dt><kbd>Esc</kbd></dt><dd>白塗りのドラッグを取り消す / 読み込みを中止</dd>
+<dt><kbd>Esc</kbd></dt><dd>ドラッグ取り消し / 読み込み中止 / 標準表示に戻す</dd>
 <dt><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></dt><dd>補正後 / 前後 / 重ね表示</dd>
 <dt><kbd>−</kbd> / <kbd>+</kbd></dt><dd>縮小 / 拡大</dd>
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
@@ -837,6 +837,11 @@ document.addEventListener('keydown', event => {
   }
   if (event.ctrlKey || event.metaKey ||
       event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+  if (event.key === 'Escape' && !ui.workspace.inert && ui.workspace.classList.contains('preview-only')) {
+    event.preventDefault();
+    ui.previewOnly.click();
+    return;
+  }
 
   if (key === '?') {
     event.preventDefault();
