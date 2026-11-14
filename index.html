@@ -14,6 +14,7 @@
 <button id="save" class="primary" disabled>補正結果を保存</button>
 </div>
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
+<progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
 <section id="workspace" hidden>
 <aside id="pages" aria-label="ページ一覧"></aside>
 <div class="card">
@@ -63,6 +64,7 @@ const extension = file => '.' + file.name.split('.').pop().toLowerCase();
 
 async function api(route, file, settings) {
   const headers = {'X-Format': extension(file)};
+  if (route === '/analyse') headers.Accept = 'application/x-ndjson';
   if (settings) headers['X-Settings'] = JSON.stringify(settings);
   const response = await fetch(route, {method:'POST', headers, body:file});
   if (!response.ok) {
@@ -71,6 +73,23 @@ async function api(route, file, settings) {
   }
   return response;
 }
+async function* analysisRecords(response) {
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let pending = '';
+  try {
+    while (true) {
+      const {done,value} = await reader.read();
+      if (done) break;
+      pending += value;
+      const lines = pending.split('\n');
+      pending = lines.pop();
+      for (const line of lines) yield JSON.parse(line);
+    }
+    if (pending) throw new Error('検出結果の受信が途中で終了しました。');
+  } finally {
+    await reader.cancel();
+  }
+}
 function busy(value) {
   ui.pdf.disabled = ui.folder.disabled = value;
   ui.save.disabled = value || !pages.length;
@@ -78,21 +97,42 @@ function busy(value) {
 async function load(files, pdf) {
   if (!files.length) return;
   pages = []; ui.workspace.hidden = true; busy(true);
+  ui.progress.hidden = false;
+  ui.progress.removeAttribute('value');
+  ui.status.textContent = 'ファイルを読み込んでいます…';
   try {
     isPdf = pdf;
     sources = files.filter(f => pdf || /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name))
       .sort((a,b) => collator.compare(path(a),path(b)));
     if (!sources.length) throw new Error('対応形式の画像がありません。');
     const result = [];
-    for (const [i,file] of sources.entries()) {
-      ui.status.textContent = pdf ? 'PDFを読み込み、五線の傾きを検出しています…' : '傾きを検出中 ' + (i+1) + ' / ' + sources.length;
-      for (const info of await (await api('/analyse',file)).json()) {
+    let total = pdf ? 0 : sources.length;
+    function showProgress() {
+      ui.progress.max = total;
+      ui.progress.value = result.length;
+      const percent = Math.floor(result.length * 100 / total);
+      ui.status.textContent = '傾き検出中 · ' + result.length + ' / ' + total + 'ページ完了（' + percent + '%）';
+    }
+    if (total) showProgress();
+    for (const file of sources) {
+      const before = result.length;
+      for await (const info of analysisRecords(await api('/analyse',file))) {
+        if (info.error) throw new Error(info.error);
+        if (info.total !== undefined) {
+          if (pdf) total = info.total;
+          showProgress();
+          continue;
+        }
         const image = new Image();
         image.src = 'data:image/jpeg;base64,' + info.preview;
         await image.decode();
         const index = result.length;
         result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
+        showProgress();
+      }
+      if (result.length - before !== (pdf ? total : 1) || !total) {
+        throw new Error('一部のページの検出結果を受信できませんでした。');
       }
     }
     pages = result;
@@ -102,6 +142,7 @@ async function load(files, pdf) {
   } catch (error) {
     ui.status.textContent = error.message;
   } finally {
+    ui.progress.hidden = true;
     busy(false); ui.pdf.value = ui.folder.value = '';
   }
 }

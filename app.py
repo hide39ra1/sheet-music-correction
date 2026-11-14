@@ -71,8 +71,7 @@ def poppler(*args):
 
 
 def load_pdf(source, folder):
-    info = poppler("pdfinfo", str(source)).decode(errors="replace")
-    count = int(re.search(r"^Pages:\s+(\d+)", info, re.M)[1])
+    count = pdf_page_count(source)
     info = poppler("pdfinfo", "-f", "1", "-l", str(count), str(source)).decode(errors="replace")
     sizes = re.findall(r"Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+)", info)
     rotations = re.findall(r"Page\s+\d+\s+rot:\s+(\d+)", info)
@@ -89,6 +88,14 @@ def load_pdf(source, folder):
     if len(pages) != count:
         raise ValueError("PDFの一部を読み込めませんでした")
     return pages
+
+
+def pdf_page_count(source):
+    info = poppler("pdfinfo", str(source)).decode(errors="replace")
+    match = re.search(r"^Pages:\s+(\d+)", info, re.M)
+    if not match:
+        raise ValueError("PDFのページ数を取得できませんでした")
+    return int(match[1])
 
 
 def write_pdf(output, pages):
@@ -173,8 +180,11 @@ class Server(BaseHTTPRequestHandler):
             pdf = fmt == ".pdf"
             if not pdf and fmt not in FORMATS:
                 raise ValueError("未対応の形式です")
-            pages = load_pdf(source, folder) if pdf else [(source, None)]
             if self.path == "/analyse":
+                if self.headers.get("Accept") == "application/x-ndjson":
+                    self.stream_analysis(source, folder, pdf)
+                    return
+                pages = load_pdf(source, folder) if pdf else [(source, None)]
                 previews = []
                 for path, _ in pages:
                     image = rgb(path)
@@ -185,6 +195,7 @@ class Server(BaseHTTPRequestHandler):
                     previews.append({"angle": angle, "preview": base64.b64encode(preview.getvalue()).decode()})
                 self.reply(json.dumps(previews).encode(), "application/json")
             elif self.path == "/export":
+                pages = load_pdf(source, folder) if pdf else [(source, None)]
                 settings = json.loads(self.headers["X-Settings"])
                 if len(settings) != len(pages):
                     raise ValueError("ページ設定の数が一致しません")
@@ -203,6 +214,39 @@ class Server(BaseHTTPRequestHandler):
                 self.reply(output.getvalue(), "application/pdf" if pdf else "application/octet-stream")
             else:
                 self.send_error(404)
+
+    def stream_analysis(self, source, folder, pdf):
+        import base64
+        count = pdf_page_count(source) if pdf else 1
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+        def send(record):
+            self.wfile.write((json.dumps(record) + "\n").encode())
+            self.wfile.flush()
+
+        try:
+            send({"total": count})
+            for number in range(1, count + 1):
+                path = source
+                if pdf:
+                    prefix = folder / "preview"
+                    poppler("pdftoppm", "-f", str(number), "-l", str(number),
+                            "-singlefile", "-cropbox", "-scale-to", "1400", "-png",
+                            str(source), str(prefix))
+                    path = prefix.with_suffix(".png")
+                image = rgb(path)
+                angle = detect(image)
+                image.thumbnail((800, 1050))
+                preview = io.BytesIO()
+                image.save(preview, "JPEG", quality=85)
+                send({"angle": angle, "preview": base64.b64encode(preview.getvalue()).decode()})
+        except ConnectionError:
+            return
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
+            send({"error": str(exc)})
 
 
 class _PageStream:
