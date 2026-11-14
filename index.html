@@ -24,6 +24,10 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 #pdfNameOptions summary{cursor:pointer;color:#235745}
 #margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
 #margins p{margin:0;font-size:13px}
+.margin-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.margin-fields label{display:flex;align-items:center;gap:4px}
+.margin-fields input[type=number]{min-width:0;width:100%;max-width:65px}
+@media(max-width:480px){.margin-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .panel>.actions,#detection{margin-bottom:10px}
 .panel details{margin-top:12px;padding-top:10px;border-top:1px solid #d7dfd8}
 .panel summary{cursor:pointer;color:#235745}
@@ -102,11 +106,13 @@ PDFをここにドラッグ＆ドロップ
 </div>
 <fieldset id="margins" hidden>
 <legend>表示向きで画像の端を白くする（%）</legend>
-<div class="actions">
+<div class="margin-fields">
 <label>上 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <label>右 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <label>下 <input type="number" min="0" max="20" step="0.1" value="0"></label>
 <label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+</div>
+<div class="actions">
 <p>画像の端付近を内側へドラッグするか、幅を入力してください。</p>
 <button id="applyMargins">この幅を全ページに適用</button>
 <button id="undoMargins" disabled>一括白塗りを元に戻す</button>
