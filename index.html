@@ -195,7 +195,13 @@ async function api(route, file, settings, signal) {
     headers['X-Settings-Length'] = String(data.length);
     body = new Blob([data,file]);
   }
-  const response = await fetch(route, {method:'POST', headers, body, signal});
+  let response;
+  try {
+    response = await fetch(route, {method:'POST', headers, body, signal});
+  } catch (error) {
+    if (signal?.aborted || !(error instanceof TypeError)) throw error;
+    throw new Error('ローカルサーバーに接続できません。デスクトップの「譜面補正を起動.bat」を確認してください。');
+  }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || '処理に失敗しました (' + response.status + ')');
