@@ -294,6 +294,7 @@ async function load(files, pdf) {
   ui.progress.removeAttribute('value');
   const inputLabel = pdf ? files[0].name : path(files[0]).split('/')[0];
   ui.status.textContent = '読み込み中… · ' + inputLabel;
+  ui.status.scrollTop = 0;
   try {
     isPdf = pdf;
     sources = files.filter(f => pdf || /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name))
@@ -582,6 +583,7 @@ function download(blob,name) {
   setTimeout(() => URL.revokeObjectURL(url),60000);
 }
 ui.save.onclick = async () => {
+  ui.status.scrollTop = 0;
   let savedImages = 0;
   let outputFolder;
   let outputPdf;
