@@ -38,6 +38,10 @@ main{padding:14px 20px}
 #dropZone[hidden]{display:none}
 #dropNotice{position:fixed;inset:0;z-index:10;display:grid;place-items:center;pointer-events:none;background:#15392ee0;color:white;font-size:clamp(18px,3vw,30px);text-align:center}
 #dropNotice[hidden]{display:none}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,#comparison:focus-visible{outline:2px solid #087ca5;outline-offset:2px}
+#comparison:focus-visible{outline-offset:-2px}
+aside .page-button:focus-visible{outline-offset:-3px}
+header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
 @media(max-width:900px){#workspace{grid-template-columns:135px minmax(0,1fr)}.panel{grid-column:2}#workspace>.panel{max-height:none}}
 @media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}#workspace>aside{max-height:160px}}
 </style>
