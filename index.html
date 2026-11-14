@@ -639,7 +639,9 @@ ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
 ui.dropZone.onclick = () => ui.pdf.click();
 function exportPdfName(file) {
   const name = ui.pdfName.value.trim().replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_').replace(/[. ]+$/,'');
-  return name ? name + '.pdf' : file.name.replace(/\.pdf$/i,'-補正.pdf');
+  if (!name) return file.name.replace(/\.pdf$/i,'-補正.pdf');
+  const reserved = /^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)/i.test(name);
+  return (reserved ? '_' : '') + name + '.pdf';
 }
 function updatePdfName() {
   if (!isPdf) return;
