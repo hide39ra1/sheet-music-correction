@@ -37,6 +37,9 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 <progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
 </header>
 <main>
+<div id="dropZone" style="border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
+PDFをここにドラッグ＆ドロップ
+</div>
 <section id="workspace" hidden>
 <aside aria-label="ページ一覧">
 <div id="pages"></div>
@@ -374,6 +377,30 @@ ui.save.onclick = async () => {
   } finally { busy(false); }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
+function isFileDrag(event) {
+  return event.dataTransfer.types.includes('Files');
+}
+document.addEventListener('dragover', event => {
+  if (!isFileDrag(event)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = ui.pdf.disabled ? 'none' : 'copy';
+  if (!ui.pdf.disabled) ui.dropZone.style.background = '#dcece3';
+});
+document.addEventListener('dragleave', event => {
+  if (!event.relatedTarget) ui.dropZone.style.background = '';
+});
+document.addEventListener('drop', event => {
+  if (!isFileDrag(event)) return;
+  event.preventDefault();
+  ui.dropZone.style.background = '';
+  if (ui.pdf.disabled) return;
+  const files = Array.from(event.dataTransfer.files);
+  if (files.length !== 1 || extension(files[0]) !== '.pdf') {
+    ui.status.textContent = 'PDFを1ファイルずつドロップしてください。画像は「画像フォルダを選ぶ」から開けます。';
+    return;
+  }
+  load(files,true);
+});
 ui.folder.onchange = () => load(Array.from(ui.folder.files),false);
 ui.angle.oninput = () => {
   if (ui.angle.value !== '' && ui.angle.validity.rangeOverflow === false && ui.angle.validity.rangeUnderflow === false) {
