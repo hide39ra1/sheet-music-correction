@@ -163,8 +163,17 @@ class Server(BaseHTTPRequestHandler):
     def process(self):
         import base64
         size = int(self.headers.get("Content-Length", "0"))
+        settings_length = int(self.headers.get("X-Settings-Length", "0"))
+        if not 0 <= settings_length <= min(8 * 1024**2, size):
+            raise ValueError("ページ設定のサイズが無効です")
+        size -= settings_length
         if not 0 < size <= 512 * 1024**2:
             raise ValueError("入力サイズが上限の512 MBを超えています")
+        settings_data = self.headers.get("X-Settings", "[]")
+        if settings_length:
+            settings_data = self.rfile.read(settings_length)
+            if len(settings_data) != settings_length:
+                raise ValueError("ページ設定の受信が途中で終了しました")
         with tempfile.TemporaryDirectory(prefix="score-") as temp:
             folder = Path(temp)
             source = folder / "input"
@@ -196,7 +205,7 @@ class Server(BaseHTTPRequestHandler):
                 self.reply(json.dumps(previews).encode(), "application/json")
             elif self.path == "/export":
                 pages = load_pdf(source, folder) if pdf else [(source, None)]
-                settings = json.loads(self.headers["X-Settings"])
+                settings = json.loads(settings_data)
                 if len(settings) != len(pages):
                     raise ValueError("ページ設定の数が一致しません")
                 def images():

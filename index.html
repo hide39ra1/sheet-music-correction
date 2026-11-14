@@ -139,8 +139,13 @@ let loading;
 async function api(route, file, settings, signal) {
   const headers = {'X-Format': extension(file)};
   if (route === '/analyse') headers.Accept = 'application/x-ndjson';
-  if (settings) headers['X-Settings'] = JSON.stringify(settings);
-  const response = await fetch(route, {method:'POST', headers, body:file, signal});
+  let body = file;
+  if (settings) {
+    const data = JSON.stringify(settings);
+    headers['X-Settings-Length'] = String(data.length);
+    body = new Blob([data,file]);
+  }
+  const response = await fetch(route, {method:'POST', headers, body, signal});
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || '処理に失敗しました (' + response.status + ')');
