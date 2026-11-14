@@ -530,7 +530,7 @@ ui.handles.onpointermove = event => {
     const edge = nearestEdge(edgeDistances(event));
     ui.handles.style.cursor = edge === -1 ? '' : edge % 2 ? 'ew-resize' : 'ns-resize';
   }
-  if (drag?.pointer !== event.pointerId) return;
+  if (!drag || drag.pointer !== event.pointerId) return;
   const value = drag.original + edgeDistances(event)[drag.edge] - drag.start;
   const page = pages[active];
   page.margins[drag.edge] = Math.round(Math.min(20,Math.max(0,value))*10)/10;
