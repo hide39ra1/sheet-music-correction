@@ -23,8 +23,14 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 #shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
 #shortcuts::backdrop{background:#10291e88}#shortcuts h2{margin-top:0}#shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:8px 20px}#shortcuts dd{margin:0}#help{color:#18352d}
 #handles.editing{touch-action:none;cursor:crosshair}
-@media(max-width:1050px){#workspace{grid-template-columns:155px minmax(0,1fr)}.panel{grid-column:2}}
-@media(max-width:700px){header{padding:10px 12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}aside{max-height:160px}}
+main{padding:14px 20px}
+#workspace{gap:12px;margin-top:0;grid-template-columns:clamp(140px,15vw,205px) minmax(0,1fr) clamp(215px,21vw,280px)}
+#workspace>.card,#workspace>aside{padding:12px}
+#workspace>aside,#workspace>.panel{max-height:calc(100dvh - 125px);overflow:auto}
+#comparison{max-height:calc(100dvh - 245px);min-height:220px}
+#dropZone[hidden]{display:none}
+@media(max-width:900px){#workspace{grid-template-columns:135px minmax(0,1fr)}.panel{grid-column:2}#workspace>.panel{max-height:none}}
+@media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}#workspace>aside{max-height:160px}}
 </style>
 <header>
 <div class="bar"><h1>譜面補正</h1>
@@ -201,7 +207,7 @@ async function load(files, pdf) {
         result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
         showProgress();
-        if (index === 0) { ui.workspace.hidden = false; select(0); }
+        if (index === 0) { ui.workspace.hidden = false; ui.dropZone.hidden = true; select(0); }
         else renderPages();
       }
       if (result.length - before !== (pdf ? total : 1) || !total) {
@@ -214,6 +220,7 @@ async function load(files, pdf) {
     ({sources,pages,active,isPdf,ready} = previous);
     ui.fit.checked = previous.fit;
     ui.workspace.hidden = !pages.length;
+    ui.dropZone.hidden = !!pages.length;
     if (pages.length) select(active);
     ui.status.textContent = loading.signal.aborted ? '読み込みを中止しました。' : error.message;
   } finally {
