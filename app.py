@@ -102,7 +102,14 @@ def pdf_pages(source, folder, dimensions):
 
 
 def pdf_page_count(source):
-    info = poppler("pdfinfo", str(source)).decode(errors="replace")
+    try:
+        info = poppler("pdfinfo", str(source)).decode(errors="replace")
+    except FileNotFoundError as exc:
+        raise ValueError("PDFを開くにはPopplerのpdfinfoが必要です。起動バッチまたはPATHの設定を確認してください。") from exc
+    except subprocess.CalledProcessError as exc:
+        if b"incorrect password" in (exc.stderr or b"").lower():
+            raise ValueError("パスワードで保護されたPDFです。保護を解除したPDFを開いてください。") from exc
+        raise ValueError("PDFを読み取れませんでした。元のPDFが開けるか確認してください。") from exc
     match = re.search(r"^Pages:\s+(\d+)", info, re.M)
     if not match:
         raise ValueError("PDFのページ数を取得できませんでした")
