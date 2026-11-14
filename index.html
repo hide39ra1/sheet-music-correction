@@ -134,6 +134,7 @@ const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e =>
 const collator = new Intl.Collator('ja', {numeric:true});
 const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
 let sources = [], pages = [], active = 0, isPdf = false, ready = false;
+let dirty = false;
 let drag = null;
 const path = file => file.webkitRelativePath || file.name;
 const extension = file => '.' + file.name.split('.').pop().toLowerCase();
@@ -179,7 +180,12 @@ function busy(value) {
 }
 async function load(files, pdf) {
   if (!files.length) return;
-  const previous = {sources,pages,active,isPdf,ready,fit:ui.fit.checked};
+  if (dirty && !confirm('保存していない調整があります。別の譜面を開きますか？')) {
+    ui.pdf.value = ui.folder.value = '';
+    return;
+  }
+  const previous = {sources,pages,active,isPdf,ready,dirty,fit:ui.fit.checked};
+  dirty = false;
   loading = new AbortController();
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
   ui.cancelLoad.hidden = false;
@@ -228,7 +234,7 @@ async function load(files, pdf) {
     ready = true;
     ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。';
   } catch (error) {
-    ({sources,pages,active,isPdf,ready} = previous);
+    ({sources,pages,active,isPdf,ready,dirty} = previous);
     ui.fit.checked = previous.fit;
     ui.workspace.hidden = !pages.length;
     ui.dropZone.hidden = !!pages.length;
@@ -320,6 +326,7 @@ function nextIndex(step) {
   return next >= 0 && next < pages.length ? next : -1;
 }
 function changed(page = pages[active]) {
+  dirty = true;
   delete page.thumbnail;
   renderPages();
   draw();
@@ -418,6 +425,7 @@ ui.save.onclick = async () => {
         await writer.write(blob); await writer.close();
       }
     }
+    dirty = false;
     ui.status.textContent = '補正結果を書き出しました。';
   } catch (error) {
     ui.status.textContent = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
@@ -462,6 +470,7 @@ ui.angle.oninput = () => {
 ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
 ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; changed(); select(active); };
 ui.fit.onchange = () => {
+  dirty = true;
   pages.forEach(page => { delete page.thumbnail; });
   renderPages(); draw();
 };
@@ -480,7 +489,7 @@ ui.applyMargins.onclick = () => {
   pages.forEach(page => {
     const next = margins.map((_,i) => margins[marginIndex(i,page)]);
     if (next.every((value,i) => value === page.margins[i])) return;
-    page.margins = next; delete page.thumbnail;
+    page.margins = next; delete page.thumbnail; dirty = true;
   });
   renderPages();
 };
@@ -528,7 +537,7 @@ ui.reset.onclick = () => {
 };
 ui.even.onclick = () => { pages.forEach((p,i) => {
   if (p.flip === (i % 2 === 1)) return;
-  p.flip = i % 2 === 1; delete p.thumbnail;
+  p.flip = i % 2 === 1; delete p.thumbnail; dirty = true;
 }); select(active); };
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
