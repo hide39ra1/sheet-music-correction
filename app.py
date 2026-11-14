@@ -17,11 +17,11 @@ FORMATS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG",
 
 
 def detect(image):
+    scale = min(1, 1200 / max(image.size))
+    if scale < 1:
+        size = tuple(max(1, round(dimension * scale)) for dimension in image.size)
+        image = image.resize(size, Image.Resampling.BOX)
     gray = np.asarray(image.convert("L"))
-    scale = min(1, 1200 / max(gray.shape))
-    height, width = gray.shape
-    size = (max(1, round(width * scale)), max(1, round(height * scale)))
-    gray = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
     edges = cv2.Canny(gray, 60, 160)
     width = gray.shape[1]
     lines = cv2.HoughLinesP(edges, 1, np.pi / 720, 65,
