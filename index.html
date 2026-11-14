@@ -294,7 +294,9 @@ async function load(files, pdf) {
     ready = true;
     rotationUndo = undefined;
     marginUndo = undefined;
-    ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。';
+    const skipped = files.length - sources.length;
+    ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。'
+      + (skipped ? ' 対応外のファイル ' + skipped + '件を除外しました。' : '');
   } catch (error) {
     ({sources,pages,active,isPdf,ready} = previous);
     setDirty(previous.dirty);
