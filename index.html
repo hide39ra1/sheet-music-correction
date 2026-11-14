@@ -213,6 +213,7 @@ const path = file => file.webkitRelativePath || file.name;
 const extension = file => '.' + file.name.split('.').pop().toLowerCase();
 
 let loading;
+let importTotal = 0;
 let failedImport;
 async function api(route, file, settings, signal) {
   const headers = {'X-Format': extension(file)};
@@ -281,6 +282,7 @@ async function load(files, pdf) {
   ui.retryLoad.hidden = true;
   setDirty(false);
   loading = new AbortController();
+  importTotal = 0;
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
   ui.cancelLoad.hidden = false;
   ui.fit.checked = true;
@@ -296,6 +298,7 @@ async function load(files, pdf) {
     const result = pages;
     let total = pdf ? 0 : sources.length;
     function showProgress() {
+      importTotal = total;
       ui.progress.max = total;
       ui.progress.value = result.length;
       const percent = Math.floor(result.length * 100 / total);
@@ -349,6 +352,8 @@ async function load(files, pdf) {
     }
   } finally {
     loading = undefined;
+    importTotal = 0;
+    if (pages.length) renderPages();
     ui.cancelLoad.hidden = true;
     ui.progress.hidden = true;
     busy(false); ui.pdf.value = ui.folder.value = '';
@@ -383,7 +388,9 @@ function renderPages() {
   ui.prev.disabled = nextIndex(-1) === -1;
   ui.next.disabled = nextIndex(1) === -1;
   ui.nextUndetected.hidden = !pages.some((page,index) => index !== active && page.detected === null);
-  ui.position.textContent = ' / ' + pages.length + 'ページ';
+  ui.position.textContent = importTotal > pages.length
+    ? ' / ' + importTotal + 'ページ（' + pages.length + 'ページ読込済み）'
+    : ' / ' + pages.length + 'ページ';
   ui.pageNumber.max = pages.length;
   if (document.activeElement !== ui.pageNumber) ui.pageNumber.value = active + 1;
 }
