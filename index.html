@@ -618,6 +618,7 @@ ui.save.onclick = async () => {
     ui.progress.hidden = true;
     ui.save.textContent = '補正結果を保存';
     busy(false);
+    if (document.activeElement === document.body) ui.save.focus({preventScroll:true});
   }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
