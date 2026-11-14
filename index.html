@@ -679,7 +679,7 @@ ui.mode.onchange = () => {
   ui.zoom.onchange();
   draw();
 };
-ui.opacity.oninput = draw;
+ui.opacity.oninput = () => { savePreviewPreferences(); draw(); };
 ui.editEdges.onchange = () => {
   ui.handles.classList.toggle('editing',ui.editEdges.checked);
   ui.margins.hidden = !ui.editEdges.checked;
@@ -695,7 +695,9 @@ ui.less.onclick = () => nudge(-0.1);
 ui.more.onclick = () => nudge(0.1);
 function savePreviewPreferences() {
   try {
-    localStorage.setItem('score-preview', JSON.stringify({mode:ui.mode.value,guide:ui.guide.checked}));
+    localStorage.setItem('score-preview', JSON.stringify({
+      mode:ui.mode.value,guide:ui.guide.checked,opacity:ui.opacity.valueAsNumber
+    }));
   } catch {}
 }
 ui.guide.onchange = () => { savePreviewPreferences(); draw(); };
@@ -753,6 +755,9 @@ try {
     ui.caption.textContent = preferences.mode === 'overlay' ? '重ねて比較' : '補正後';
   }
   ui.guide.checked = preferences?.guide === true;
+  if (Number.isInteger(preferences?.opacity) && preferences.opacity >= 0 && preferences.opacity <= 100) {
+    ui.opacity.value = preferences.opacity;
+  }
 } catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
 document.addEventListener('keydown', event => {
