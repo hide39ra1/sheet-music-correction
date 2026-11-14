@@ -33,6 +33,8 @@ main{padding:14px 20px}
 .views[data-zoom="fit"] .sheet{width:fit-content;max-width:100%;margin-inline:auto}
 .views[data-zoom="fit"] .sheet canvas+canvas{width:100%;height:100%;margin:0}
 #dropZone[hidden]{display:none}
+#dropNotice{position:fixed;inset:0;z-index:10;display:grid;place-items:center;pointer-events:none;background:#15392ee0;color:white;font-size:clamp(18px,3vw,30px);text-align:center}
+#dropNotice[hidden]{display:none}
 @media(max-width:900px){#workspace{grid-template-columns:135px minmax(0,1fr)}.panel{grid-column:2}#workspace>.panel{max-height:none}}
 @media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}#workspace>aside{max-height:160px}}
 </style>
@@ -124,6 +126,7 @@ PDFをここにドラッグ＆ドロップ
 
 </div></section>
 </main>
+<div id="dropNotice" hidden>PDFをドロップして開く</div>
 <dialog id="shortcuts" aria-labelledby="shortcutTitle">
 <h2 id="shortcutTitle">キー操作</h2>
 <dl>
@@ -481,15 +484,15 @@ document.addEventListener('dragover', event => {
   if (!isFileDrag(event)) return;
   event.preventDefault();
   event.dataTransfer.dropEffect = ui.pdf.disabled ? 'none' : 'copy';
-  if (!ui.pdf.disabled) ui.dropZone.style.background = '#dcece3';
+  ui.dropNotice.hidden = ui.pdf.disabled;
 });
 document.addEventListener('dragleave', event => {
-  if (!event.relatedTarget) ui.dropZone.style.background = '';
+  if (!event.relatedTarget) ui.dropNotice.hidden = true;
 });
 document.addEventListener('drop', event => {
   if (!isFileDrag(event)) return;
   event.preventDefault();
-  ui.dropZone.style.background = '';
+  ui.dropNotice.hidden = true;
   if (ui.pdf.disabled) return;
   const files = Array.from(event.dataTransfer.files);
   if (files.length !== 1 || extension(files[0]) !== '.pdf') {
