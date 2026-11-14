@@ -42,7 +42,17 @@ def detect(image):
     return round(sum(a*w for a, w in group) / sum(w for _, w in group), 2)
 
 
-def corrected(image, angle, flip, fit):
+def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0)):
+    if len(margins) != 4 or any(not 0 <= value <= 20 for value in margins):
+        raise ValueError("端の白塗りは各辺0〜20%で指定してください")
+    top, right, bottom, left = (
+        round(value * dimension / 100)
+        for value, dimension in zip(margins, (image.height, image.width, image.height, image.width))
+    )
+    width, height = image.size
+    for box in ((0, 0, width, top), (width-right, 0, width, height),
+                (0, height-bottom, width, height), (0, 0, left, height)):
+        image.paste("white", box)
     if flip:
         image = image.transpose(Image.Transpose.ROTATE_180)
     if not angle:
@@ -179,11 +189,11 @@ class Server(BaseHTTPRequestHandler):
                 if len(settings) != len(pages):
                     raise ValueError("ページ設定の数が一致しません")
                 def images():
-                    for (path, dimensions), (angle, flip, fit) in zip(pages, settings):
+                    for (path, dimensions), (angle, flip, fit, *options) in zip(pages, settings):
                         angle = float(angle)
                         if not math.isfinite(angle) or abs(angle) > 15:
                             raise ValueError("角度は±15°以内で指定してください")
-                        yield corrected(rgb(path), angle, flip, fit), dimensions
+                        yield corrected(rgb(path), angle, flip, fit, *options), dimensions
                 output = io.BytesIO()
                 if pdf:
                     write_pdf(output, _PageStream(len(pages), images()))

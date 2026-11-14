@@ -37,6 +37,16 @@
 <option value="3">300%</option>
 </select></label>
 </div>
+<fieldset id="margins">
+<legend>補正前の画像の端を白くする（%）</legend>
+<div class="actions">
+<label>上 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>右 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>下 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<label>左 <input type="number" min="0" max="20" step="0.1" value="0"></label>
+<button id="applyMargins">この幅を全ページに適用</button>
+</div>
+</fieldset>
 <div id="comparison" style="overflow:auto" tabindex="0" aria-label="補正前後の比較">
 <div class="views" id="views">
 <figure><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
@@ -46,6 +56,7 @@
 <script>
 const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e => [e.id,e]));
 const collator = new Intl.Collator('ja', {numeric:true});
+const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
 let sources = [], pages = [], active = 0, isPdf = false;
 const path = file => file.webkitRelativePath || file.name;
 const extension = file => '.' + file.name.split('.').pop().toLowerCase();
@@ -80,7 +91,7 @@ async function load(files, pdf) {
         image.src = 'data:image/jpeg;base64,' + info.preview;
         await image.decode();
         const index = result.length;
-        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1,
+        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
       }
     }
@@ -106,13 +117,14 @@ function select(index) {
   }));
   ui.title.textContent = page.name;
   ui.angle.value = page.angle; ui.flip.checked = page.flip;
+  marginInputs.forEach((input,i) => { input.value = page.margins[i]; });
   ui.detection.textContent = page.detected === null
     ? '傾きを検出できませんでした。必要に応じて角度を調整してください。'
     : '検出した補正角度 ' + page.detected.toFixed(2) + '°';
   draw();
 }
 function draw() {
-  const {image,angle,flip} = pages[active];
+  const {image,angle,flip,margins} = pages[active];
   const w = image.width, h = image.height, rad = -angle * Math.PI / 180;
   for (const canvas of [ui.before,ui.after]) {
     canvas.width = w; canvas.height = h;
@@ -128,6 +140,13 @@ function draw() {
       ctx.rotate(rad + (flip ? Math.PI : 0));
     }
     ctx.drawImage(image,-w/2,-h/2);
+    if (canvas === ui.after) {
+      const [top,right,bottom,left] = margins.map((value,i) => Math.round(value * (i % 2 ? w : h) / 100));
+      ctx.fillRect(-w/2,-h/2,w,top);
+      ctx.fillRect(w/2-right,-h/2,right,h);
+      ctx.fillRect(-w/2,h/2-bottom,w,bottom);
+      ctx.fillRect(-w/2,-h/2,left,h);
+    }
     if (ui.guide.checked) {
       ctx.setTransform(1,0,0,1,0,0);
       ctx.strokeStyle = '#087ca5';
@@ -149,7 +168,7 @@ function download(blob,name) {
 }
 ui.save.onclick = async () => {
   busy(true);
-  const settings = pages.map(p => [p.angle,p.flip,ui.fit.checked]);
+  const settings = pages.map(p => [p.angle,p.flip,ui.fit.checked,p.margins]);
   try {
     if (isPdf) {
       ui.status.textContent = 'PDFを書き出しています…';
@@ -185,11 +204,24 @@ ui.angle.oninput = () => {
 ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
 ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; draw(); };
 ui.fit.onchange = draw;
+marginInputs.forEach((input,i) => {
+  input.oninput = () => {
+    if (!Number.isFinite(input.valueAsNumber) || input.validity.rangeUnderflow || input.validity.rangeOverflow) return;
+    pages[active].margins[i] = input.valueAsNumber;
+    draw();
+  };
+  input.onchange = () => { input.value = pages[active].margins[i]; };
+});
+ui.applyMargins.onclick = () => {
+  const margins = pages[active].margins;
+  pages.forEach(page => { page.margins = [...margins]; });
+};
 ui.guide.onchange = draw;
 ui.zoom.onchange = () => { ui.views.style.width = Number(ui.zoom.value) * 100 + '%'; };
 ui.reset.onclick = () => {
   pages[active].angle = pages[active].detected ?? 0;
   pages[active].flip = active % 2 === 1;
+  pages[active].margins = [0,0,0,0];
   select(active);
 };
 ui.even.onclick = () => { pages.forEach((p,i) => p.flip = i % 2 === 1); select(active); };
