@@ -276,6 +276,12 @@ function select(index) {
   active = index;
   const page = pages[index];
   renderPages();
+  const selected = ui.pages.children[index];
+  const list = ui.pages.parentElement;
+  const row = selected.getBoundingClientRect();
+  const viewport = list.getBoundingClientRect();
+  if (row.top < viewport.top) list.scrollTop += row.top - viewport.top;
+  else if (row.bottom > viewport.bottom) list.scrollTop += row.bottom - viewport.bottom;
   ui.title.textContent = page.name;
   ui.angle.value = page.angle; ui.flip.checked = page.flip;
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
