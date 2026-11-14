@@ -48,6 +48,8 @@ main{padding:14px 20px}
 #dropNotice[hidden]{display:none}
 button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,#comparison:focus-visible{outline:2px solid #087ca5;outline-offset:2px}
 #comparison:focus-visible{outline-offset:-2px}
+#workspace.preview-only{grid-template-columns:minmax(0,1fr)}
+#workspace.preview-only>aside,#workspace.preview-only>.panel{display:none}
 #comparison,#workspace>aside,#workspace>.panel{overscroll-behavior:contain}
 aside .page-button:focus-visible{outline-offset:-3px}
 header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
@@ -103,6 +105,7 @@ PDFをここにドラッグ＆ドロップ
 <option value="2">200%</option><option value="3">300%</option>
 </select></label>
 <label><input id="editEdges" type="checkbox"> 端の白塗りを調整</label>
+<button type="button" id="previewOnly" aria-pressed="false">譜面を広く表示</button>
 </div>
 <fieldset id="margins" hidden>
 <legend>表示向きで画像の端を白くする（%）</legend>
@@ -172,6 +175,7 @@ PDFをここにドラッグ＆ドロップ
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
 <dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>補正結果を保存</dd>
 <dt><kbd>O</kbd></dt><dd>PDFを選ぶ</dd>
+<dt><kbd>F</kbd></dt><dd>譜面を広く表示 / 標準表示</dd>
 </dl>
 <form method="dialog"><button autofocus>閉じる</button></form>
 </dialog>
@@ -804,6 +808,12 @@ try {
   }
 } catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
+ui.previewOnly.onclick = () => {
+  const expanded = ui.workspace.classList.toggle('preview-only');
+  ui.previewOnly.setAttribute('aria-pressed', expanded);
+  ui.previewOnly.textContent = expanded ? '標準表示に戻す' : '譜面を広く表示';
+  fitPreviewHeight();
+};
 document.addEventListener('keydown', event => {
   if (drag) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') event.preventDefault();
@@ -857,6 +867,7 @@ document.addEventListener('keydown', event => {
     case 'r': if (!event.repeat) ui.flip.click(); break;
     case 'g': if (!event.repeat) ui.guide.click(); break;
     case 'm': if (!event.repeat) ui.editEdges.click(); break;
+    case 'f': if (!event.repeat) ui.previewOnly.click(); break;
     case '1':
     case '2':
     case '3':
