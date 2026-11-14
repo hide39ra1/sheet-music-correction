@@ -35,6 +35,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 </div>
 <p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
 <progress id="progress" aria-label="傾き検出の進捗" style="width:100%;accent-color:#235745" hidden></progress>
+<button id="cancelLoad" hidden>読み込みを中止</button>
 </header>
 <main>
 <div id="dropZone" style="border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
@@ -120,11 +121,12 @@ let drag = null;
 const path = file => file.webkitRelativePath || file.name;
 const extension = file => '.' + file.name.split('.').pop().toLowerCase();
 
-async function api(route, file, settings) {
+let loading;
+async function api(route, file, settings, signal) {
   const headers = {'X-Format': extension(file)};
   if (route === '/analyse') headers.Accept = 'application/x-ndjson';
   if (settings) headers['X-Settings'] = JSON.stringify(settings);
-  const response = await fetch(route, {method:'POST', headers, body:file});
+  const response = await fetch(route, {method:'POST', headers, body:file, signal});
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || '処理に失敗しました (' + response.status + ')');
@@ -155,7 +157,10 @@ function busy(value) {
 }
 async function load(files, pdf) {
   if (!files.length) return;
+  const previous = {sources,pages,active,isPdf,ready,fit:ui.fit.checked};
+  loading = new AbortController();
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
+  ui.cancelLoad.hidden = false;
   ui.fit.checked = true;
   ui.progress.hidden = false;
   ui.progress.removeAttribute('value');
@@ -176,7 +181,7 @@ async function load(files, pdf) {
     if (total) showProgress();
     for (const file of sources) {
       const before = result.length;
-      for await (const info of analysisRecords(await api('/analyse',file))) {
+      for await (const info of analysisRecords(await api('/analyse',file,undefined,loading.signal))) {
         if (info.error) throw new Error(info.error);
         if (info.total !== undefined) {
           if (pdf) total = info.total;
@@ -186,6 +191,7 @@ async function load(files, pdf) {
         const image = new Image();
         image.src = 'data:image/jpeg;base64,' + info.preview;
         await image.decode();
+        loading.signal.throwIfAborted();
         const index = result.length;
         result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
@@ -198,10 +204,16 @@ async function load(files, pdf) {
       }
     }
     ready = true;
-    ui.status.textContent = pages.length + 'ページを読み込みました。';
+    ui.status.textContent = (pdf ? sources[0].name + ' · ' : '') + pages.length + 'ページを読み込みました。';
   } catch (error) {
-    ui.status.textContent = error.message;
+    ({sources,pages,active,isPdf,ready} = previous);
+    ui.fit.checked = previous.fit;
+    ui.workspace.hidden = !pages.length;
+    if (pages.length) select(active);
+    ui.status.textContent = loading.signal.aborted ? '読み込みを中止しました。' : error.message;
   } finally {
+    loading = undefined;
+    ui.cancelLoad.hidden = true;
     ui.progress.hidden = true;
     busy(false); ui.pdf.value = ui.folder.value = '';
   }
@@ -377,6 +389,7 @@ ui.save.onclick = async () => {
   } finally { busy(false); }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
+ui.cancelLoad.onclick = () => loading?.abort();
 function isFileDrag(event) {
   return event.dataTransfer.types.includes('Files');
 }
