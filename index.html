@@ -18,6 +18,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
 .viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
+#documentName{margin:0 0 10px;font-size:14px;overflow-wrap:anywhere}
 #margins{margin:12px 0 0;border:1px solid #d7dfd8;border-radius:8px}
 #margins p{margin:0;font-size:13px}
 #shortcuts{max-width:min(90vw,420px);border:1px solid #9caca4;border-radius:12px;color:#202a25;padding:20px}
@@ -55,6 +56,7 @@ PDFをここにドラッグ＆ドロップ
 <div id="pages"></div>
 </aside>
 <div class="card viewer">
+<h2 id="documentName"></h2>
 <nav class="actions" aria-label="ページ送り">
 <button id="prev">前へ</button>
 <form id="jump" class="actions">
@@ -267,6 +269,7 @@ function orientedMargins(page) {
 }
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
+  ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
   ui.pageNumber.value = index + 1;
   drag = null;
   if (active !== index) ui.comparison.scrollTo(0,0);
