@@ -60,6 +60,10 @@ PDFをここにドラッグ＆ドロップ
 </aside>
 <div class="card viewer">
 <h2 id="documentName"></h2>
+<details id="pdfNameOptions" hidden>
+<summary>保存ファイル名</summary>
+<label>ファイル名 <input id="pdfName" type="text" maxlength="180"> .pdf</label>
+</details>
 <nav class="actions" aria-label="ページ送り">
 <button id="prev">前へ</button>
 <form id="jump" class="actions">
@@ -213,7 +217,7 @@ async function load(files, pdf) {
     ui.pdf.value = ui.folder.value = '';
     return;
   }
-  const previous = {sources,pages,active,isPdf,ready,dirty,fit:ui.fit.checked};
+  const previous = {sources,pages,active,isPdf,ready,dirty,fit:ui.fit.checked,pdfName:ui.pdfName.value};
   setDirty(false);
   loading = new AbortController();
   pages = []; ready = false; ui.workspace.hidden = true; busy(true);
@@ -227,6 +231,7 @@ async function load(files, pdf) {
     sources = files.filter(f => pdf || /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name))
       .sort((a,b) => collator.compare(path(a),path(b)));
     if (!sources.length) throw new Error('対応形式の画像がありません。');
+    ui.pdfName.value = pdf ? sources[0].name.replace(/\.pdf$/i,'') + '-補正' : '';
     const result = pages;
     let total = pdf ? 0 : sources.length;
     function showProgress() {
@@ -268,6 +273,7 @@ async function load(files, pdf) {
     ({sources,pages,active,isPdf,ready} = previous);
     setDirty(previous.dirty);
     ui.fit.checked = previous.fit;
+    ui.pdfName.value = previous.pdfName;
     ui.workspace.hidden = !pages.length;
     ui.dropZone.hidden = !!pages.length;
     if (pages.length) select(active);
@@ -315,6 +321,7 @@ function orientedMargins(page) {
 }
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
+  ui.pdfNameOptions.hidden = !isPdf;
   ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
   ui.pageNumber.value = index + 1;
   drag = null;
@@ -449,7 +456,8 @@ ui.save.onclick = async () => {
     if (isPdf) {
       ui.status.textContent = 'PDFを書き出しています…';
       const file = sources[0];
-      download(await (await api('/export',file,settings)).blob(), file.name.replace(/\.pdf$/i,'-補正.pdf'));
+      const name = ui.pdfName.value.trim().replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_').replace(/[. ]+$/,'');
+      download(await (await api('/export',file,settings)).blob(), name ? name + '.pdf' : file.name.replace(/\.pdf$/i,'-補正.pdf'));
     } else {
       if (!window.showDirectoryPicker) throw new Error('フォルダへの保存には Microsoft Edge または Google Chrome を使用してください。');
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
