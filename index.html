@@ -494,6 +494,8 @@ function download(blob,name) {
   setTimeout(() => URL.revokeObjectURL(url),60000);
 }
 ui.save.onclick = async () => {
+  let savedImages = 0;
+  let outputFolder;
   busy(true);
   ui.workspace.inert = true;
   ui.save.textContent = '保存中…';
@@ -510,6 +512,7 @@ ui.save.onclick = async () => {
       const parent = await window.showDirectoryPicker({mode:'readwrite'});
       const name = path(sources[0]).split('/')[0] + '-補正-' + Date.now();
       const root = await parent.getDirectoryHandle(name,{create:true});
+      outputFolder = name;
       ui.progress.max = sources.length;
       ui.progress.value = 0;
       ui.progress.hidden = false;
@@ -521,13 +524,16 @@ ui.save.onclick = async () => {
         const handle = await dir.getFileHandle(file.name,{create:true});
         const writer = await handle.createWritable();
         await writer.write(blob); await writer.close();
-        ui.progress.value = i + 1;
+        ui.progress.value = ++savedImages;
       }
     }
     setDirty(false);
     ui.status.textContent = '補正結果を書き出しました。';
   } catch (error) {
-    ui.status.textContent = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
+    const message = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
+    ui.status.textContent = savedImages
+      ? message + ' 「' + outputFolder + '」に ' + savedImages + ' / ' + sources.length + '枚を保存しました。'
+      : message;
   } finally {
     ui.workspace.inert = false;
     ui.progress.hidden = true;
