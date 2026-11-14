@@ -263,6 +263,13 @@ function busy(value) {
 }
 async function load(files, pdf) {
   if (!files.length) return;
+  if (pdf && (!files[0].size || files[0].size > 512 * 1024 ** 2)) {
+    ui.status.textContent = files[0].size
+      ? 'PDFは512 MB以下のファイルを選んでください。'
+      : '空のPDFです。別のファイルを選んでください。';
+    ui.pdf.value = '';
+    return;
+  }
   if (dirty && !confirm('保存していない調整があります。別の譜面を開きますか？')) {
     ui.pdf.value = ui.folder.value = '';
     return;
