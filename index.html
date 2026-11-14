@@ -240,6 +240,7 @@ async function load(files, pdf) {
     return;
   }
   const previous = {sources,pages,active,isPdf,ready,dirty,fit:ui.fit.checked,pdfName:ui.pdfName.value};
+  let currentFile;
   failedImport = undefined;
   ui.retryLoad.hidden = true;
   setDirty(false);
@@ -266,6 +267,7 @@ async function load(files, pdf) {
     }
     if (total) showProgress();
     for (const file of sources) {
+      currentFile = file;
       const before = result.length;
       for await (const info of analysisRecords(await api('/analyse',file,undefined,loading.signal))) {
         if (info.error) throw new Error(info.error);
@@ -301,7 +303,8 @@ async function load(files, pdf) {
     ui.workspace.hidden = !pages.length;
     ui.dropZone.hidden = !!pages.length;
     if (pages.length) select(active);
-    ui.status.textContent = loading.signal.aborted ? '読み込みを中止しました。' : error.message;
+    ui.status.textContent = loading.signal.aborted ? '読み込みを中止しました。'
+      : (currentFile ? '「' + path(currentFile) + '」を開けませんでした。' : '') + error.message;
     if (!loading.signal.aborted) {
       failedImport = {files,pdf};
       ui.retryLoad.hidden = false;
