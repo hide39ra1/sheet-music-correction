@@ -131,7 +131,7 @@ PDFをドロップ、またはクリックして選択
 <canvas id="after" aria-label="補正後の譜面"></canvas><canvas id="handles" aria-hidden="true"></canvas>
 </div></figure>
 </div></div></div>
-<div class="card panel">
+<div class="card panel" tabindex="0" role="region" aria-labelledby="title">
 <h2 id="title"></h2>
 <div class="actions">
 <button id="less" aria-label="角度を0.1度減らす">−0.1°</button>
@@ -910,7 +910,7 @@ document.addEventListener('keydown', event => {
       break;
     case 'home':
     case 'end':
-      if (event.target.closest?.('#comparison, #status')) return;
+      if (event.target.closest?.('#comparison, #status, .panel')) return;
       select(key === 'home' ? 0 : pages.length - 1);
       break;
     case '[': ui.less.click(); break;
