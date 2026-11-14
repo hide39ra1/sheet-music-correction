@@ -90,6 +90,7 @@ PDFをここにドラッグ＆ドロップ
 <p>画像の端付近を内側へドラッグするか、幅を入力してください。</p>
 <button id="applyMargins">この幅を全ページに適用</button>
 <button id="undoMargins" disabled>一括白塗りを元に戻す</button>
+<button id="clearMargins">このページの白塗りを解除</button>
 </div>
 </fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
@@ -534,6 +535,13 @@ ui.undoMargins.onclick = () => {
   ui.undoMargins.disabled = true;
   setDirty(true);
   select(active);
+};
+ui.clearMargins.onclick = () => {
+  const page = pages[active];
+  if (page.margins.every(value => value === 0)) return;
+  page.margins = [0,0,0,0];
+  marginInputs.forEach(input => { input.value = 0; });
+  changed();
 };
 ui.prev.onclick = () => select(nextIndex(-1));
 ui.jump.onsubmit = event => {
