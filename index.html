@@ -138,6 +138,7 @@ PDFをここにドラッグ＆ドロップ
 <h2 id="shortcutTitle">キー操作</h2>
 <dl>
 <dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>前 / 次のページ</dd>
+<dt><kbd>Home</kbd> / <kbd>End</kbd></dt><dd>最初 / 最後の読み込み済みページ</dd>
 <dt><kbd>[</kbd> / <kbd>]</kbd></dt><dd>角度を −0.1° / +0.1°</dd>
 <dt><kbd>R</kbd></dt><dd>180°回転を切り替え</dd>
 <dt><kbd>G</kbd></dt><dd>水平ガイドを切り替え</dd>
@@ -672,6 +673,11 @@ document.addEventListener('keydown', event => {
   switch (key) {
     case 'arrowleft': ui.prev.click(); break;
     case 'arrowright': ui.next.click(); break;
+    case 'home':
+    case 'end':
+      if (event.target.closest?.('#comparison')) return;
+      select(key === 'home' ? 0 : pages.length - 1);
+      break;
     case '[': ui.less.click(); break;
     case ']': ui.more.click(); break;
     case 'r': if (!event.repeat) ui.flip.click(); break;
