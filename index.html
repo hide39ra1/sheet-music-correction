@@ -593,7 +593,7 @@ ui.save.onclick = async () => {
       ui.progress.hidden = false;
       for (const [i,file] of sources.entries()) {
         exportingImage = path(file);
-        ui.status.textContent = '画像を保存中 · ' + i + ' / ' + sources.length + '枚完了';
+        ui.status.textContent = '画像を保存中（' + i + ' / ' + sources.length + '枚完了） · ' + file.name;
         const blob = await (await api('/export',file,[settings[i]])).blob();
         let dir = root;
         for (const name of path(file).split('/').slice(1,-1)) dir = await dir.getDirectoryHandle(name,{create:true});
