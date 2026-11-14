@@ -70,9 +70,9 @@ header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
 <button id="retryLoad" hidden>読み込みを再試行</button>
 </header>
 <main>
-<div id="dropZone" style="border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
-PDFをここにドラッグ＆ドロップ
-</div>
+<button id="dropZone" type="button" style="width:100%;border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
+PDFをドロップ、またはクリックして選択
+</button>
 <section id="workspace" hidden>
 <aside aria-label="ページ一覧">
 <div id="pages"></div>
@@ -254,6 +254,7 @@ async function* analysisRecords(response) {
   }
 }
 function busy(value) {
+  ui.dropZone.disabled = value;
   ui.undoRotation.disabled = value || !rotationUndo;
   ui.undoMargins.disabled = value || !marginUndo;
   ui.even.disabled = value || !ready;
@@ -610,6 +611,7 @@ ui.save.onclick = async () => {
   }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
+ui.dropZone.onclick = () => ui.pdf.click();
 function exportPdfName(file) {
   const name = ui.pdfName.value.trim().replace(/\.pdf$/i,'').replace(/[<>:"/\\|?*]/g,'_').replace(/[. ]+$/,'');
   return name ? name + '.pdf' : file.name.replace(/\.pdf$/i,'-補正.pdf');
