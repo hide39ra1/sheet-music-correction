@@ -277,26 +277,34 @@ async function load(files, pdf) {
   }
 }
 function renderPages() {
-  const entries = pages.flatMap((page,index) => {
-    const button = document.createElement('button');
-    button.className = 'page-button';
+  while (ui.pages.children.length > pages.length) ui.pages.lastElementChild.remove();
+  pages.forEach((page,index) => {
+    let button = ui.pages.children[index];
+    if (!button) {
+      button = document.createElement('button');
+      button.className = 'page-button';
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      const label = document.createElement('span');
+      label.append(document.createElement('span'), document.createElement('small'));
+      button.append(image,label);
+      button.onclick = () => select(index);
+      ui.pages.append(button);
+    }
     button.setAttribute('aria-current', index === active);
-    const thumb = document.createElement('img');
-    thumb.src = page.thumbnail ??= thumbnail(page); thumb.alt = ''; thumb.loading = 'lazy';
-    const text = document.createElement('span');
-    text.textContent = page.name;
-    const badges = document.createElement('small');
+    const [thumb,label] = button.children;
+    const [text,badges] = label.children;
+    const src = page.thumbnail ??= thumbnail(page);
+    if (thumb.src !== src) thumb.src = src;
+    if (text.textContent !== page.name) text.textContent = page.name;
     badges.textContent = [page.flip && '180°', page.detected === null && '傾き要確認'].filter(Boolean).join(' · ');
-    text.append(badges); button.append(thumb,text);
-    button.onclick = () => select(index);
-    return [button];
   });
   ui.prev.disabled = nextIndex(-1) === -1;
   ui.next.disabled = nextIndex(1) === -1;
   ui.position.textContent = ' / ' + pages.length + 'ページ';
   ui.pageNumber.max = pages.length;
   if (document.activeElement !== ui.pageNumber) ui.pageNumber.value = active + 1;
-  ui.pages.replaceChildren(...entries);
 }
 function orientedMargins(page) {
   const [top,right,bottom,left] = page.margins;
