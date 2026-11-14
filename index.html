@@ -614,7 +614,13 @@ ui.save.onclick = async () => {
         for (const name of path(file).split('/').slice(1,-1)) dir = await dir.getDirectoryHandle(name,{create:true});
         const handle = await dir.getFileHandle(file.name,{create:true});
         const writer = await handle.createWritable();
-        await writer.write(blob); await writer.close();
+        try {
+          await writer.write(blob);
+          await writer.close();
+        } catch (error) {
+          await writer.abort().catch(() => {});
+          throw error;
+        }
         ui.progress.value = ++savedImages;
       }
     }
