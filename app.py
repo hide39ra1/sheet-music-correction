@@ -2,6 +2,7 @@ import io
 import json
 import math
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -230,13 +231,22 @@ class Server(BaseHTTPRequestHandler):
                         if not math.isfinite(angle) or abs(angle) > 15:
                             raise ValueError("角度は±15°以内で指定してください")
                         yield corrected(rgb(path), angle, flip, fit, *options), dimensions
-                output = io.BytesIO()
                 if pdf:
-                    write_pdf(output, _PageStream(len(dimensions), images()))
+                    with tempfile.TemporaryFile(dir=folder) as output:
+                        write_pdf(output, _PageStream(len(dimensions), images()))
+                        length = output.tell()
+                        output.seek(0)
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/pdf")
+                        self.send_header("Content-Length", str(length))
+                        self.send_header("Cache-Control", "no-store")
+                        self.end_headers()
+                        shutil.copyfileobj(output, self.wfile, length=256 * 1024)
                 else:
+                    output = io.BytesIO()
                     image, _ = next(images())
                     image.save(output, FORMATS[fmt], **({"quality": 95} if fmt in (".jpg", ".jpeg", ".webp") else {}))
-                self.reply(output.getvalue(), "application/pdf" if pdf else "application/octet-stream")
+                    self.reply(output.getvalue(), "application/octet-stream")
             else:
                 self.send_error(404)
 
