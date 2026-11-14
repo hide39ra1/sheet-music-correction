@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>譜面補正</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf0eb;color:#202a25;font:15px system-ui,sans-serif}header{background:#18352d;color:#fff;padding:28px max(20px,5vw)}h1{margin:0;font-size:34px}p{line-height:1.55}main{max-width:1400px;margin:auto;padding:24px}.bar,.card,aside{background:white;border:1px solid #d7dfd8;border-radius:12px;padding:16px}.bar,.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,.pick{font:inherit;padding:8px 13px;border:1px solid #9caca4;border-radius:7px;background:white;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.primary{background:#235745;color:white;border-color:#235745}.pick input{position:absolute;opacity:0;width:1px}.pick:focus-within{outline:2px solid}#workspace{display:grid;grid-template-columns:230px 1fr;gap:16px;margin-top:16px}#workspace[hidden]{display:none}aside{max-height:75vh;overflow:auto}aside button{display:block;width:100%;margin-bottom:7px;text-align:left;overflow-wrap:anywhere}aside button[aria-current=true]{background:#dcece3;border-color:#235745}.views{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}figure{margin:0;min-width:0}figcaption{margin-bottom:6px;font-weight:600}canvas{width:100%;display:block;border:1px solid #d7dfd8;background:white}.card h2{margin-top:0;overflow-wrap:anywhere}input[type=number]{width:76px;font:inherit}#status{min-height:1.5em;overflow-wrap:anywhere}@media(max-width:700px){main{padding:12px}#workspace{grid-template-columns:1fr}aside{max-height:160px}}
+</style>
+<header><h1>譜面補正</h1><p>スキャンした楽譜の傾きと上下の向きを整えます。</p></header>
+<main>
+<div class="bar">
+<label class="pick">PDFを選ぶ<input id="pdf" type="file" accept=".pdf"></label>
+<label class="pick">画像フォルダを選ぶ<input id="folder" type="file" webkitdirectory multiple></label>
+<button id="save" class="primary" disabled>補正結果を保存</button>
+</div>
+<p id="status" role="status">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
+<section id="workspace" hidden>
+<aside id="pages" aria-label="ページ一覧"></aside>
+<div class="card">
+<h2 id="title"></h2>
+<div class="actions">
+<label>角度 <input id="angle" type="number" min="-15" max="15" step="0.05"> °</label>
+<label><input id="flip" type="checkbox"> 180°回転</label>
+<button id="reset">このページを初期設定に戻す</button>
+</div>
+<p id="detection"></p>
+<div class="actions">
+<label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
+<button id="even">全ページを奇数正常・偶数反転に戻す</button>
+</div>
+<div class="views">
+<figure><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
+<figure><figcaption>補正後</figcaption><canvas id="after" aria-label="補正後の譜面"></canvas></figure>
+</div></div></section>
+</main>
+<script>
+const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]'), e => [e.id,e]));
+const collator = new Intl.Collator('ja', {numeric:true});
+let sources = [], pages = [], active = 0, isPdf = false;
+const path = file => file.webkitRelativePath || file.name;
+const extension = file => '.' + file.name.split('.').pop().toLowerCase();
+
+async function api(route, file, settings) {
+  const headers = {'X-Format': extension(file)};
+  if (settings) headers['X-Settings'] = JSON.stringify(settings);
+  const response = await fetch(route, {method:'POST', headers, body:file});
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || '処理に失敗しました (' + response.status + ')');
+  }
+  return response;
+}
+function busy(value) {
+  ui.pdf.disabled = ui.folder.disabled = value;
+  ui.save.disabled = value || !pages.length;
+}
+async function load(files, pdf) {
+  if (!files.length) return;
+  pages = []; ui.workspace.hidden = true; busy(true);
+  try {
+    isPdf = pdf;
+    sources = files.filter(f => pdf || /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name))
+      .sort((a,b) => collator.compare(path(a),path(b)));
+    if (!sources.length) throw new Error('対応形式の画像がありません。');
+    const result = [];
+    for (const [i,file] of sources.entries()) {
+      ui.status.textContent = pdf ? 'PDFを読み込み、五線の傾きを検出しています…' : '傾きを検出中 ' + (i+1) + ' / ' + sources.length;
+      for (const info of await (await api('/analyse',file)).json()) {
+        const image = new Image();
+        image.src = 'data:image/jpeg;base64,' + info.preview;
+        await image.decode();
+        const index = result.length;
+        result.push({image, detected:info.angle, angle:info.angle ?? 0, flip:index % 2 === 1,
+          name:pdf ? (index+1) + 'ページ' : path(file)});
+      }
+    }
+    pages = result;
+    ui.fit.checked = true;
+    ui.status.textContent = pages.length + 'ページを読み込みました。';
+    ui.workspace.hidden = false; select(0);
+  } catch (error) {
+    ui.status.textContent = error.message;
+  } finally {
+    busy(false); ui.pdf.value = ui.folder.value = '';
+  }
+}
+function select(index) {
+  active = index;
+  const page = pages[index];
+  ui.pages.replaceChildren(...pages.map((p,i) => {
+    const button = document.createElement('button');
+    button.textContent = p.name + (p.detected === null ? ' · 要確認' : '');
+    button.setAttribute('aria-current', i === index);
+    button.onclick = () => select(i);
+    return button;
+  }));
+  ui.title.textContent = page.name;
+  ui.angle.value = page.angle; ui.flip.checked = page.flip;
+  ui.detection.textContent = page.detected === null
+    ? '傾きを検出できませんでした。必要に応じて角度を調整してください。'
+    : '検出した補正角度 ' + page.detected.toFixed(2) + '°';
+  draw();
+}
+function draw() {
+  const {image,angle,flip} = pages[active];
+  const w = image.width, h = image.height, rad = -angle * Math.PI / 180;
+  for (const canvas of [ui.before,ui.after]) {
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white'; ctx.fillRect(0,0,w,h);
+    ctx.translate(w/2,h/2);
+    if (canvas === ui.after) {
+      if (ui.fit.checked) {
+        const c = Math.abs(Math.cos(rad)), s = Math.abs(Math.sin(rad));
+        const scale = Math.min(w/(w*c+h*s), h/(w*s+h*c), 1);
+        ctx.scale(scale,scale);
+      }
+      ctx.rotate(rad + (flip ? Math.PI : 0));
+    }
+    ctx.drawImage(image,-w/2,-h/2);
+  }
+}
+function download(blob,name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url),60000);
+}
+ui.save.onclick = async () => {
+  busy(true);
+  const settings = pages.map(p => [p.angle,p.flip,ui.fit.checked]);
+  try {
+    if (isPdf) {
+      ui.status.textContent = 'PDFを書き出しています…';
+      const file = sources[0];
+      download(await (await api('/export',file,settings)).blob(), file.name.replace(/\.pdf$/i,'-補正.pdf'));
+    } else {
+      if (!window.showDirectoryPicker) throw new Error('フォルダへの保存には Microsoft Edge または Google Chrome を使用してください。');
+      const parent = await window.showDirectoryPicker({mode:'readwrite'});
+      const name = path(sources[0]).split('/')[0] + '-補正-' + Date.now();
+      const root = await parent.getDirectoryHandle(name,{create:true});
+      for (const [i,file] of sources.entries()) {
+        ui.status.textContent = '画像を保存中 ' + (i+1) + ' / ' + sources.length;
+        const blob = await (await api('/export',file,[settings[i]])).blob();
+        let dir = root;
+        for (const name of path(file).split('/').slice(1,-1)) dir = await dir.getDirectoryHandle(name,{create:true});
+        const handle = await dir.getFileHandle(file.name,{create:true});
+        const writer = await handle.createWritable();
+        await writer.write(blob); await writer.close();
+      }
+    }
+    ui.status.textContent = '補正結果を書き出しました。';
+  } catch (error) {
+    ui.status.textContent = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
+  } finally { busy(false); }
+};
+ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
+ui.folder.onchange = () => load(Array.from(ui.folder.files),false);
+ui.angle.oninput = () => {
+  if (ui.angle.value !== '' && ui.angle.validity.rangeOverflow === false && ui.angle.validity.rangeUnderflow === false) {
+    pages[active].angle = ui.angle.valueAsNumber; draw();
+  }
+};
+ui.angle.onchange = () => { ui.angle.value = pages[active].angle; };
+ui.flip.onchange = () => { pages[active].flip = ui.flip.checked; draw(); };
+ui.fit.onchange = draw;
+ui.reset.onclick = () => {
+  pages[active].angle = pages[active].detected ?? 0;
+  pages[active].flip = active % 2 === 1;
+  select(active);
+};
+ui.even.onclick = () => { pages.forEach((p,i) => p.flip = i % 2 === 1); select(active); };
+</script>
+</html>

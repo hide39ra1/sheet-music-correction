@@ -1,0 +1,6 @@
+*
+!.gitignore
+!app.py
+!index.html
+!requirements.txt
+!README.md
