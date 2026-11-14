@@ -79,6 +79,7 @@ PDFをここにドラッグ＆ドロップ
 <span id="position"></span><button type="submit">移動</button>
 </form>
 <button id="next">次へ</button>
+<button id="nextUndetected" hidden>傾き未検出へ</button>
 </nav>
 <div class="actions">
 <label>表示 <select id="mode">
@@ -348,6 +349,7 @@ function renderPages() {
   });
   ui.prev.disabled = nextIndex(-1) === -1;
   ui.next.disabled = nextIndex(1) === -1;
+  ui.nextUndetected.hidden = !pages.some((page,index) => index !== active && page.detected === null);
   ui.position.textContent = ' / ' + pages.length + 'ページ';
   ui.pageNumber.max = pages.length;
   if (document.activeElement !== ui.pageNumber) ui.pageNumber.value = active + 1;
@@ -658,6 +660,17 @@ ui.jump.onsubmit = event => {
   if (Number.isInteger(index) && index >= 0 && index < pages.length) select(index);
 };
 ui.next.onclick = () => select(nextIndex(1));
+function nextUndetectedPage() {
+  for (let offset = 1; offset < pages.length; offset++) {
+    const index = (active + offset) % pages.length;
+    if (pages[index].detected === null) return index;
+  }
+  return -1;
+}
+ui.nextUndetected.onclick = () => {
+  const index = nextUndetectedPage();
+  if (index !== -1) select(index);
+};
 ui.mode.onchange = () => {
   ui.views.dataset.mode = ui.mode.value;
   ui.opacityControl.hidden = ui.mode.value !== 'overlay';
