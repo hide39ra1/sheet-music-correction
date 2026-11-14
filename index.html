@@ -389,6 +389,8 @@ function download(blob,name) {
 }
 ui.save.onclick = async () => {
   busy(true);
+  ui.workspace.inert = true;
+  ui.save.textContent = '保存中…';
   const settings = pages.map(p => [p.angle,p.flip,ui.fit.checked,[...p.margins]]);
   try {
     if (isPdf) {
@@ -413,7 +415,11 @@ ui.save.onclick = async () => {
     ui.status.textContent = '補正結果を書き出しました。';
   } catch (error) {
     ui.status.textContent = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
-  } finally { busy(false); }
+  } finally {
+    ui.workspace.inert = false;
+    ui.save.textContent = '補正結果を保存';
+    busy(false);
+  }
 };
 ui.pdf.onchange = () => load(Array.from(ui.pdf.files),true);
 ui.cancelLoad.onclick = () => loading?.abort();
@@ -535,7 +541,7 @@ document.addEventListener('keydown', event => {
     if (!event.repeat) ui.help.click();
     return;
   }
-  if (!pages.length) return;
+  if (!pages.length || ui.workspace.inert) return;
 
   const modes = ['after','split','overlay'];
   switch (key) {
