@@ -155,6 +155,7 @@ PDFをここにドラッグ＆ドロップ
 <dt><kbd>−</kbd> / <kbd>+</kbd></dt><dd>縮小 / 拡大</dd>
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
 <dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>補正結果を保存</dd>
+<dt><kbd>O</kbd></dt><dd>PDFを選ぶ</dd>
 </dl>
 <form method="dialog"><button autofocus>閉じる</button></form>
 </dialog>
@@ -800,6 +801,11 @@ document.addEventListener('keydown', event => {
   if (key === '?') {
     event.preventDefault();
     if (!event.repeat) ui.help.click();
+    return;
+  }
+  if (key === 'o' && !ui.pdf.disabled) {
+    event.preventDefault();
+    if (!event.repeat) ui.pdf.click();
     return;
   }
   if (!pages.length || ui.workspace.inert) return;
