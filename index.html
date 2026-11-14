@@ -84,7 +84,7 @@ PDFをドロップ、またはクリックして選択
 <summary id="pdfNameSummary">保存ファイル名</summary>
 <label>ファイル名 <input id="pdfName" type="text" maxlength="180"> .pdf</label>
 </details>
-<nav class="actions" aria-label="ページ送り">
+<nav id="pageNavigation" class="actions" aria-label="ページ送り">
 <button id="prev">前へ</button>
 <form id="jump" class="actions">
 <input id="pageNumber" aria-label="移動先のページ番号" type="number" min="1" step="1" required>
@@ -93,7 +93,7 @@ PDFをドロップ、またはクリックして選択
 <button id="next">次へ</button>
 <button id="nextUndetected" hidden>傾き未検出へ</button>
 </nav>
-<div class="actions">
+<div id="previewControls" class="actions">
 <label>表示 <select id="mode">
 <option value="after">補正後</option>
 <option value="split">補正前後</option>
@@ -190,7 +190,9 @@ function fitPreviewHeight() {
   ui.comparison.style.setProperty('--preview-height', Math.max(180, window.innerHeight - top - 20) + 'px');
 }
 const previewLayout = new ResizeObserver(fitPreviewHeight);
-for (const element of [document.querySelector('header'),ui.margins,ui.pdfNameOptions,ui.comparison.previousElementSibling]) {
+for (const element of [
+  document.querySelector('header'), ui.pageNavigation, ui.previewControls, ui.margins, ui.pdfNameOptions
+]) {
   previewLayout.observe(element);
 }
 window.addEventListener('resize', fitPreviewHeight, {passive:true});
