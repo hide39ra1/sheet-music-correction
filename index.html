@@ -117,10 +117,13 @@ PDFをドロップ、またはクリックして選択
 </select></label>
 <label id="opacityControl" hidden>補正前の濃さ <input id="opacity" type="range" min="0" max="100" value="50"></label>
 <label><input id="guide" type="checkbox"> 水平ガイド</label>
-<label>表示倍率 <select id="zoom">
-<option value="1">全体</option><option value="1.5">150%</option>
-<option value="2">200%</option><option value="3">300%</option>
-</select></label>
+<div class="actions" role="group" aria-label="譜面の拡大縮小">
+<button id="fitPage" aria-pressed="false">全体</button>
+<button id="fitWidth" aria-pressed="true">幅に合わせる</button>
+<button id="zoomOut" aria-label="譜面を縮小">−</button>
+<label><input id="zoom" aria-label="幅に対する表示倍率" type="number" min="10" max="800" value="100">%</label>
+<button id="zoomIn" aria-label="譜面を拡大">＋</button>
+</div>
 <label><input id="editEdges" type="checkbox"> 端の白塗りを調整</label>
 </div>
 <fieldset id="margins" hidden>
@@ -139,7 +142,7 @@ PDFをドロップ、またはクリックして選択
 </div>
 </fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
-<div class="views" id="views" data-mode="after" data-zoom="fit">
+<div class="views" id="views" data-mode="after" data-zoom="width">
 <figure id="original"><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
 <figure><figcaption id="caption">補正後</figcaption><div class="sheet">
 <canvas id="after" aria-label="補正後の譜面"></canvas><canvas id="handles" aria-hidden="true"></canvas>
@@ -204,6 +207,7 @@ function fitPreviewHeight() {
   if (ui.workspace.hidden) return;
   const top = ui.comparison.getBoundingClientRect().top + window.scrollY;
   ui.comparison.style.setProperty('--preview-height', Math.max(180, window.innerHeight - top - 20) + 'px');
+  if (zoomMode === 'fit' && document.activeElement !== ui.zoom) ui.zoom.value = Math.round(currentZoom());
 }
 const previewLayout = new ResizeObserver(fitPreviewHeight);
 for (const element of [
@@ -779,8 +783,8 @@ ui.mode.onchange = () => {
   ui.views.dataset.mode = ui.mode.value;
   ui.opacityControl.hidden = ui.mode.value !== 'overlay';
   ui.caption.textContent = ui.mode.value === 'overlay' ? '重ねて比較' : '補正後';
-  ui.zoom.onchange();
   draw();
+  applyZoom();
 };
 ui.opacity.oninput = () => { savePreviewPreferences(); draw(); };
 ui.editEdges.onchange = () => {
@@ -811,35 +815,53 @@ function savePreviewPreferences() {
   } catch {}
 }
 ui.guide.onchange = () => { savePreviewPreferences(); draw(); };
+let zoomScale = 100;
+let zoomMode = 'width';
+
 function applyZoom(clientX, clientY) {
   const box = ui.comparison;
   const bounds = box.getBoundingClientRect();
-  const anchorX = clientX === undefined ? box.clientWidth / 2 : clientX - bounds.left;
-  const anchorY = clientY === undefined ? box.clientHeight / 2 : clientY - bounds.top;
-  const x = (box.scrollLeft + anchorX) / ui.views.offsetWidth;
-  const y = (box.scrollTop + anchorY) / ui.views.offsetHeight;
-  ui.views.dataset.zoom = ui.zoom.value === '1' ? 'fit' : 'custom';
-  const factor = ui.mode.value === 'split' && ui.zoom.value !== '1' ? 2 : 1;
-  ui.views.style.width = Number(ui.zoom.value) * factor * 100 + '%';
-  box.scrollTo(x * ui.views.offsetWidth - anchorX, y * ui.views.offsetHeight - anchorY);
+  const before = ui.views.getBoundingClientRect();
+  const anchorX = clientX ?? bounds.left + box.clientWidth / 2;
+  const anchorY = clientY ?? bounds.top + box.clientHeight / 2;
+  const x = (anchorX - before.left) / Math.max(1,before.width);
+  const y = (anchorY - before.top) / Math.max(1,before.height);
+  ui.views.dataset.zoom = zoomMode;
+  ui.views.style.width = (zoomMode === 'custom' ? zoomScale : 100) + '%';
+  ui.fitPage.setAttribute('aria-pressed', zoomMode === 'fit');
+  ui.fitWidth.setAttribute('aria-pressed', zoomMode === 'width');
+  ui.zoom.value = Math.round(currentZoom());
+  const after = ui.views.getBoundingClientRect();
+  box.scrollTo(box.scrollLeft + after.left + x * after.width - anchorX,
+               box.scrollTop + after.top + y * after.height - anchorY);
 }
-ui.zoom.onchange = () => applyZoom();
-let pinchDelta = 0;
-let lastPinch = -Infinity;
+function currentZoom() {
+  if (zoomMode !== 'fit') return zoomScale;
+  const canvas = ui.after.getBoundingClientRect();
+  const figure = ui.caption.parentElement.getBoundingClientRect();
+  return figure.width ? Math.min(100, 100 * canvas.width / figure.width) : 100;
+}
+function changeZoom(scale, clientX, clientY) {
+  zoomScale = Math.max(10, Math.min(800, scale));
+  zoomMode = 'custom';
+  applyZoom(clientX, clientY);
+}
+ui.fitPage.onclick = () => { zoomMode = 'fit'; applyZoom(); };
+ui.fitWidth.onclick = () => { zoomMode = 'width'; zoomScale = 100; applyZoom(); };
+ui.zoom.onchange = () => {
+  if (Number.isFinite(ui.zoom.valueAsNumber)) changeZoom(ui.zoom.valueAsNumber);
+  else ui.zoom.value = Math.round(currentZoom());
+};
+ui.zoomIn.onclick = () => changeZoom(currentZoom() * 1.25);
+ui.zoomOut.onclick = () => changeZoom(currentZoom() / 1.25);
 ui.comparison.addEventListener('wheel', event => {
   // Chromium sends trackpad pinches as Ctrl+wheel.
   if (!event.ctrlKey || !event.cancelable) return;
   event.preventDefault();
-  if (event.timeStamp - lastPinch > 180) pinchDelta = 0;
-  lastPinch = event.timeStamp;
-  pinchDelta += event.deltaY;
-  if (Math.abs(pinchDelta) < 20) return;
-  const step = pinchDelta < 0 ? 1 : -1;
-  pinchDelta = 0;
-  const index = ui.zoom.selectedIndex + step;
-  if (index < 0 || index >= ui.zoom.length) return;
-  ui.zoom.selectedIndex = index;
-  applyZoom(event.clientX, event.clientY);
+  if (drag) return;
+  const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? ui.comparison.clientHeight : 1;
+  const change = Math.max(-1, Math.min(1, -event.deltaY * units / 160));
+  changeZoom(currentZoom() * Math.exp(change), event.clientX, event.clientY);
 }, {passive:false});
 ui.reset.onclick = () => {
   pages[active].angle = pages[active].detected ?? 0;
@@ -979,9 +1001,7 @@ document.addEventListener('keydown', event => {
       break;
     case '-':
     case '+':
-      ui.zoom.selectedIndex = Math.max(0,Math.min(ui.zoom.length-1,
-        ui.zoom.selectedIndex + (key === '+' ? 1 : -1)));
-      ui.zoom.onchange();
+      (key === '+' ? ui.zoomIn : ui.zoomOut).click();
       break;
     default: return;
   }

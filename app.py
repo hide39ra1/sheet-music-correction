@@ -262,7 +262,7 @@ class Server(BaseHTTPRequestHandler):
                 for path, _ in pages:
                     image = rgb(path)
                     angle = detect(image)
-                    image.thumbnail((800, 1050))
+                    image.thumbnail((2000, 2000))
                     preview = io.BytesIO()
                     image.save(preview, "JPEG", quality=85)
                     previews.append({"angle": angle, "preview": base64.b64encode(preview.getvalue()).decode()})
@@ -322,7 +322,7 @@ class Server(BaseHTTPRequestHandler):
                     path = prefix.with_suffix(".png")
                 image = rgb(path)
                 angle = detect(image)
-                image.thumbnail((800, 1050))
+                image.thumbnail((2000, 2000))
                 preview = io.BytesIO()
                 image.save(preview, "JPEG", quality=85)
                 send({"angle": angle, "preview": base64.b64encode(preview.getvalue()).decode()})
