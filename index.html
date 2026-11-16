@@ -78,6 +78,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 #comparison,#workspace>aside,#workspace>.panel{overscroll-behavior:contain}
 aside .page-button:focus-visible{outline-offset:-3px}
 header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
+#cancelLoad,#retryLoad{color:#18352d;white-space:nowrap}
 @media(max-width:900px){#workspace{--left-width:125px;--right-width:185px}}
 @media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:24px minmax(0,1fr) 24px;grid-template-areas:". pages ." "left preview right" ". panel ."}#workspace>aside{max-height:160px}}
 </style>
@@ -88,11 +89,11 @@ header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
 <button id="save" class="primary" aria-keyshortcuts="Control+s Meta+s" disabled>補正結果を保存</button>
 <span id="unsaved" hidden>未保存の調整あり</span>
 <button id="help" aria-keyshortcuts="Shift+/" aria-haspopup="dialog">キー操作</button>
+<button id="cancelLoad" type="button" hidden>読み込みを中止</button>
+<button id="retryLoad" type="button" hidden>読み込みを再試行</button>
 </div>
 <p id="status" role="status" tabindex="0" aria-label="処理状況">PDF、または JPEG・PNG・TIFF・BMP・WebP の画像フォルダを選択してください。</p>
 <progress id="progress" aria-label="処理の進捗" style="width:100%;accent-color:#235745" hidden></progress>
-<button id="cancelLoad" hidden>読み込みを中止</button>
-<button id="retryLoad" hidden>読み込みを再試行</button>
 </header>
 <main>
 <button id="dropZone" type="button" style="width:100%;border:2px dashed #658477;border-radius:12px;padding:20px;text-align:center;background:#fff;margin-bottom:16px">
