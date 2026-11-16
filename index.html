@@ -56,13 +56,21 @@ main{padding:14px 20px}
 #dropNotice[hidden]{display:none}
 button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible,#comparison:focus-visible{outline:2px solid #087ca5;outline-offset:2px}
 #comparison:focus-visible{outline-offset:-2px}
-#workspace.preview-only{grid-template-columns:minmax(0,1fr)}
-#workspace.preview-only>aside,#workspace.preview-only>.panel{display:none}
+#workspace{--left-width:clamp(140px,15vw,205px);--right-width:clamp(215px,21vw,280px);grid-template-columns:var(--left-width) 24px minmax(0,1fr) 24px var(--right-width);grid-template-areas:"pages left preview right panel";column-gap:4px}
+#workspace.left-closed{--left-width:0px}
+#workspace.right-closed{--right-width:0px}
+#pageSidebar{grid-area:pages}
+.viewer{grid-area:preview}
+#adjustSidebar{grid-area:panel}
+#togglePages{grid-area:left}
+#toggleAdjust{grid-area:right}
+.sidebar-toggle{padding:4px 0;min-height:56px;color:#235745;font-size:18px}
+#workspace>[hidden]{display:none}
 #comparison,#workspace>aside,#workspace>.panel{overscroll-behavior:contain}
 aside .page-button:focus-visible{outline-offset:-3px}
 header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
-@media(max-width:900px){#workspace{grid-template-columns:135px minmax(0,1fr)}.panel{grid-column:2}#workspace>.panel{max-height:none}}
-@media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:minmax(0,1fr)}.panel{grid-column:auto}#workspace>aside{max-height:160px}}
+@media(max-width:900px){#workspace{--left-width:125px;--right-width:185px}}
+@media(max-width:700px){header{padding:10px 12px}main{padding:12px}#workspace{grid-template-columns:24px minmax(0,1fr) 24px;grid-template-areas:". pages ." "left preview right" ". panel ."}#workspace>aside{max-height:160px}}
 </style>
 <header>
 <div class="bar"><h1>譜面補正</h1>
@@ -82,9 +90,10 @@ header button:focus-visible,header .pick:focus-within{outline-color:#aee6d2}
 PDFをドロップ、またはクリックして選択
 </button>
 <section id="workspace" hidden>
-<aside aria-label="ページ一覧">
+<aside id="pageSidebar" aria-label="ページ一覧">
 <div id="pages"></div>
 </aside>
+<button type="button" class="sidebar-toggle" id="togglePages" aria-controls="pageSidebar" aria-expanded="true" aria-label="ページ一覧を閉じる" title="ページ一覧を閉じる">‹</button>
 <div class="card viewer">
 <h2 id="documentName"></h2>
 <details id="pdfNameOptions" hidden>
@@ -113,7 +122,6 @@ PDFをドロップ、またはクリックして選択
 <option value="2">200%</option><option value="3">300%</option>
 </select></label>
 <label><input id="editEdges" type="checkbox"> 端の白塗りを調整</label>
-<button type="button" id="previewOnly" aria-pressed="false">譜面を広く表示</button>
 </div>
 <fieldset id="margins" hidden>
 <legend>表示向きで画像の端を白くする（%）</legend>
@@ -137,7 +145,8 @@ PDFをドロップ、またはクリックして選択
 <canvas id="after" aria-label="補正後の譜面"></canvas><canvas id="handles" aria-hidden="true"></canvas>
 </div></figure>
 </div></div></div>
-<div class="card panel" tabindex="0" role="region" aria-labelledby="title">
+<button type="button" class="sidebar-toggle" id="toggleAdjust" aria-controls="adjustSidebar" aria-expanded="true" aria-label="調整パネルを閉じる" title="調整パネルを閉じる">›</button>
+<div id="adjustSidebar" class="card panel" tabindex="0" role="region" aria-labelledby="title">
 <h2 id="title"></h2>
 <div class="actions">
 <button id="less" aria-label="角度を0.1度減らす">−0.1°</button>
@@ -183,7 +192,7 @@ PDFをドロップ、またはクリックして選択
 <dt><kbd>?</kbd></dt><dd>この一覧を開く</dd>
 <dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>補正結果を保存</dd>
 <dt><kbd>O</kbd></dt><dd>PDFを選ぶ</dd>
-<dt><kbd>F</kbd></dt><dd>譜面を広く表示 / 標準表示</dd>
+<dt><kbd>F</kbd></dt><dd>左右のパネルをまとめて閉じる / 開く</dd>
 </dl>
 <form method="dialog"><button autofocus>閉じる</button></form>
 </dialog>
@@ -861,12 +870,20 @@ try {
   }
 } catch {}
 ui.help.onclick = () => ui.shortcuts.showModal();
-ui.previewOnly.onclick = () => {
-  const expanded = ui.workspace.classList.toggle('preview-only');
-  ui.previewOnly.setAttribute('aria-pressed', expanded);
-  ui.previewOnly.textContent = expanded ? '標準表示に戻す' : '譜面を広く表示';
+function setSidebar(side, closed) {
+  const left = side === 'left';
+  const panel = left ? ui.pageSidebar : ui.adjustSidebar;
+  const button = left ? ui.togglePages : ui.toggleAdjust;
+  panel.hidden = closed;
+  ui.workspace.classList.toggle(side + '-closed',closed);
+  button.setAttribute('aria-expanded',!closed);
+  button.textContent = left === closed ? '›' : '‹';
+  button.title = (left ? 'ページ一覧' : '調整パネル') + (closed ? 'を開く' : 'を閉じる');
+  button.setAttribute('aria-label',button.title);
   fitPreviewHeight();
-};
+}
+ui.togglePages.onclick = () => setSidebar('left',!ui.pageSidebar.hidden);
+ui.toggleAdjust.onclick = () => setSidebar('right',!ui.adjustSidebar.hidden);
 document.addEventListener('keydown', event => {
   if (drag) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') event.preventDefault();
@@ -890,9 +907,10 @@ document.addEventListener('keydown', event => {
   }
   if (event.ctrlKey || event.metaKey ||
       event.target.closest?.('input, select, textarea, [contenteditable]')) return;
-  if (event.key === 'Escape' && !ui.workspace.inert && ui.workspace.classList.contains('preview-only')) {
+  if (event.key === 'Escape' && pages.length && !ui.workspace.inert && (ui.pageSidebar.hidden || ui.adjustSidebar.hidden)) {
     event.preventDefault();
-    ui.previewOnly.click();
+    setSidebar('left',false);
+    setSidebar('right',false);
     return;
   }
 
@@ -925,7 +943,13 @@ document.addEventListener('keydown', event => {
     case 'r': if (!event.repeat) ui.flip.click(); break;
     case 'g': if (!event.repeat) ui.guide.click(); break;
     case 'm': if (!event.repeat) ui.editEdges.click(); break;
-    case 'f': if (!event.repeat) ui.previewOnly.click(); break;
+    case 'f':
+      if (!event.repeat) {
+        const close = !ui.pageSidebar.hidden && !ui.adjustSidebar.hidden;
+        setSidebar('left',close);
+        setSidebar('right',close);
+      }
+      break;
     case '1':
     case '2':
     case '3':
