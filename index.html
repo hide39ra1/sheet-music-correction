@@ -811,15 +811,36 @@ function savePreviewPreferences() {
   } catch {}
 }
 ui.guide.onchange = () => { savePreviewPreferences(); draw(); };
-ui.zoom.onchange = () => {
+function applyZoom(clientX, clientY) {
   const box = ui.comparison;
-  const x = (box.scrollLeft + box.clientWidth/2) / ui.views.offsetWidth;
-  const y = (box.scrollTop + box.clientHeight/2) / ui.views.offsetHeight;
+  const bounds = box.getBoundingClientRect();
+  const anchorX = clientX === undefined ? box.clientWidth / 2 : clientX - bounds.left;
+  const anchorY = clientY === undefined ? box.clientHeight / 2 : clientY - bounds.top;
+  const x = (box.scrollLeft + anchorX) / ui.views.offsetWidth;
+  const y = (box.scrollTop + anchorY) / ui.views.offsetHeight;
   ui.views.dataset.zoom = ui.zoom.value === '1' ? 'fit' : 'custom';
   const factor = ui.mode.value === 'split' && ui.zoom.value !== '1' ? 2 : 1;
   ui.views.style.width = Number(ui.zoom.value) * factor * 100 + '%';
-  box.scrollTo(x*ui.views.offsetWidth-box.clientWidth/2,y*ui.views.offsetHeight-box.clientHeight/2);
-};
+  box.scrollTo(x * ui.views.offsetWidth - anchorX, y * ui.views.offsetHeight - anchorY);
+}
+ui.zoom.onchange = () => applyZoom();
+let pinchDelta = 0;
+let lastPinch = -Infinity;
+ui.comparison.addEventListener('wheel', event => {
+  // Chromium sends trackpad pinches as Ctrl+wheel.
+  if (!event.ctrlKey || !event.cancelable) return;
+  event.preventDefault();
+  if (event.timeStamp - lastPinch > 180) pinchDelta = 0;
+  lastPinch = event.timeStamp;
+  pinchDelta += event.deltaY;
+  if (Math.abs(pinchDelta) < 20) return;
+  const step = pinchDelta < 0 ? 1 : -1;
+  pinchDelta = 0;
+  const index = ui.zoom.selectedIndex + step;
+  if (index < 0 || index >= ui.zoom.length) return;
+  ui.zoom.selectedIndex = index;
+  applyZoom(event.clientX, event.clientY);
+}, {passive:false});
 ui.reset.onclick = () => {
   pages[active].angle = pages[active].detected ?? 0;
   pages[active].flip = active % 2 === 1;
