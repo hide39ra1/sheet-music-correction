@@ -17,6 +17,7 @@ FORMATS = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG",
 
 
 def detect(image):
+    original = image
     scale = min(1, 1200 / max(image.size))
     if scale < 1:
         size = tuple(max(1, round(dimension * scale)) for dimension in image.size)
@@ -42,7 +43,40 @@ def detect(image):
     group = [pair for j in range(peak-1, peak+2) for pair in votes.get(j, [])]
     if len(group) < 5:
         return None
-    return round(sum(a*w for a, w in group) / sum(w for _, w in group), 2)
+    estimate = sum(a*w for a, w in group) / sum(w for _, w in group)
+    return refine_angle(original, estimate)
+
+
+def refine_angle(image, estimate):
+    # Horizontal staff edges concentrate into fewer rows at the correct angle.
+    gray = image.convert("L")
+    gray.thumbnail((2000, 2000), Image.Resampling.BOX)
+    pixels = np.asarray(gray)
+    height, width = pixels.shape
+    if min(height, width) < 20:
+        return round(estimate, 2)
+    vertical = cv2.Sobel(pixels, cv2.CV_32F, 0, 1, ksize=3)
+    horizontal = cv2.Sobel(pixels, cv2.CV_32F, 1, 0, ksize=3)
+    edges = np.maximum(np.abs(vertical) - np.abs(horizontal), 0)
+    # Exclude page boundaries, which may have a different angle from the staff.
+    edges = edges[height//20:height-height//20, width//20:width-width//20]
+    y, x = np.nonzero(edges > 100)
+    if len(x) < 100:
+        return round(estimate, 2)
+    weights = edges[y, x]
+    x = x - edges.shape[1] / 2
+    padding = width // 5 + 2
+
+    def score(angle):
+        rows = (y - x * math.tan(math.radians(angle)) + padding) * 4
+        projection = np.bincount(np.rint(rows).astype(np.int32), weights,
+                                 minlength=4*(height + 2*padding))
+        projection = cv2.GaussianBlur(projection[np.newaxis, :], (17, 1), 2)[0]
+        return np.dot(projection, projection)
+
+    coarse = max((estimate + step * 0.05 for step in range(-10, 11)), key=score)
+    fine = max((coarse + step * 0.01 for step in range(-5, 6)), key=score)
+    return round(fine, 2)
 
 
 def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0)):
@@ -283,7 +317,7 @@ class Server(BaseHTTPRequestHandler):
                 if pdf:
                     prefix = folder / "preview"
                     poppler("pdftoppm", "-f", str(number), "-l", str(number),
-                            "-singlefile", "-cropbox", "-scale-to", "1400", "-png",
+                            "-singlefile", "-cropbox", "-scale-to", "2000", "-png",
                             str(source), str(prefix))
                     path = prefix.with_suffix(".png")
                 image = rgb(path)
