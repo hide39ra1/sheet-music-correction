@@ -23,7 +23,9 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .views[data-mode=after] #original,.views[data-mode=overlay] #original{display:none}
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
-.views.show-guide .sheet::after{content:"";position:absolute;inset:0;pointer-events:none;clip-path:inset(1px 0 1px);background:repeating-linear-gradient(to bottom,transparent 0 calc(100% / 12 - .6px),rgb(8 124 165 / 45%) calc(100% / 12 - .6px) calc(100% / 12))}
+.guide-lines{display:none;position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.views.show-guide .guide-lines{display:block}
+.guide-lines path{fill:none;stroke:#007798;stroke-width:1px;vector-effect:non-scaling-stroke;shape-rendering:crispEdges}
 .viewer-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:5px 6px}
 .viewer-toolbar .actions{gap:4px}
 .viewer-toolbar :is(button,select,input){font-size:13px}
@@ -819,6 +821,18 @@ ui.guide.onchange = () => {
   ui.views.classList.toggle('show-guide',ui.guide.checked);
   savePreviewPreferences();
 };
+for (const sheet of ui.views.querySelectorAll('.sheet')) {
+  const namespace = 'http://www.w3.org/2000/svg';
+  const guide = document.createElementNS(namespace,'svg');
+  guide.setAttribute('class','guide-lines');
+  guide.setAttribute('viewBox','0 0 1 12');
+  guide.setAttribute('preserveAspectRatio','none');
+  guide.setAttribute('aria-hidden','true');
+  const lines = document.createElementNS(namespace,'path');
+  lines.setAttribute('d',Array.from({length:11},(_,index) => 'M0 ' + (index + 1) + 'H1').join(' '));
+  guide.append(lines);
+  sheet.append(guide);
+}
 let zoomScale = 100;
 let zoomMode = 'width';
 
