@@ -23,7 +23,15 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .views[data-mode=after] #original,.views[data-mode=overlay] #original{display:none}
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
-.viewer nav{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #d7dfd8}
+.viewer-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:5px 6px}
+.viewer-toolbar .actions{gap:4px}
+.viewer-toolbar :is(button,select,input){font-size:13px}
+.viewer-toolbar button{padding:3px 6px}
+.viewer-toolbar input[type=number]{width:48px}
+#workspace>.card.viewer{padding:0}
+main:has(#workspace:not([hidden])){padding-block:4px}
+#comparison{margin-top:0;padding:5px}
+.views[data-mode=after] #caption{display:none}
 #documentName,.panel #title{margin:0 0 10px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pdfNameOptions{margin:0 0 10px;font-size:13px}
 #pdfNameOptions input{font:inherit;width:min(26ch,65%);padding:4px}
@@ -47,9 +55,10 @@ main{padding:14px 20px}
 #workspace>.card,#workspace>aside{padding:12px}
 #workspace>aside,#workspace>.panel{max-height:calc(100dvh - 125px);overflow:auto}
 #comparison{--preview-height:max(220px, calc(100dvh - 245px));max-height:var(--preview-height);min-height:180px}
-.views[data-zoom="fit"] canvas{max-height:calc(var(--preview-height) - 54px);width:auto;max-width:100%;margin-inline:auto}
+.views[data-zoom="fit"] canvas{max-height:calc(var(--preview-height) - 38px);width:auto;max-width:100%;margin-inline:auto}
+.views[data-mode="after"][data-zoom="fit"] canvas{max-height:calc(var(--preview-height) - 12px)}
 .views[data-zoom="fit"] .sheet{width:fit-content;max-width:100%;margin-inline:auto}
-.views[data-zoom="fit"] .sheet canvas+canvas{width:100%;height:100%;margin:0}
+.views[data-zoom="fit"] .sheet canvas+canvas{width:100%;height:100%;max-height:none;margin:0}
 #dropZone[hidden]{display:none}
 .pick:has(input:disabled){opacity:.55;cursor:default}
 #dropNotice{position:fixed;inset:0;z-index:10;display:grid;place-items:center;pointer-events:none;background:#15392ee0;color:white;font-size:clamp(18px,3vw,30px);text-align:center}
@@ -95,11 +104,7 @@ PDFをドロップ、またはクリックして選択
 </aside>
 <button type="button" class="sidebar-toggle" id="togglePages" aria-controls="pageSidebar" aria-expanded="true" aria-label="ページ一覧を閉じる" title="ページ一覧を閉じる">‹</button>
 <div class="card viewer">
-<h2 id="documentName"></h2>
-<details id="pdfNameOptions" hidden>
-<summary id="pdfNameSummary">保存ファイル名</summary>
-<label>ファイル名 <input id="pdfName" type="text" maxlength="180"> .pdf</label>
-</details>
+<div class="viewer-toolbar">
 <nav id="pageNavigation" class="actions" aria-label="ページ送り">
 <button id="prev">前へ</button>
 <form id="jump" class="actions">
@@ -126,6 +131,7 @@ PDFをドロップ、またはクリックして選択
 </div>
 <label><input id="editEdges" type="checkbox"> 端の白塗りを調整</label>
 </div>
+</div>
 <fieldset id="margins" hidden>
 <legend>表示向きで画像の端を白くする（%）</legend>
 <div class="margin-fields">
@@ -150,6 +156,11 @@ PDFをドロップ、またはクリックして選択
 </div></div></div>
 <button type="button" class="sidebar-toggle" id="toggleAdjust" aria-controls="adjustSidebar" aria-expanded="true" aria-label="調整パネルを閉じる" title="調整パネルを閉じる">›</button>
 <div id="adjustSidebar" class="card panel" tabindex="0" role="region" aria-labelledby="title">
+<h2 id="documentName"></h2>
+<details id="pdfNameOptions" hidden>
+<summary id="pdfNameSummary">保存ファイル名</summary>
+<label>ファイル名 <input id="pdfName" type="text" maxlength="180"> .pdf</label>
+</details>
 <h2 id="title"></h2>
 <div class="actions">
 <button id="less" aria-label="角度を0.01度減らす">−0.01°</button>
@@ -206,12 +217,12 @@ const marginInputs = Array.from(ui.margins.querySelectorAll('input'));
 function fitPreviewHeight() {
   if (ui.workspace.hidden) return;
   const top = ui.comparison.getBoundingClientRect().top + window.scrollY;
-  ui.comparison.style.setProperty('--preview-height', Math.max(180, window.innerHeight - top - 20) + 'px');
+  ui.comparison.style.setProperty('--preview-height', Math.max(180, window.innerHeight - top - 6) + 'px');
   if (zoomMode === 'fit' && document.activeElement !== ui.zoom) ui.zoom.value = Math.round(currentZoom());
 }
 const previewLayout = new ResizeObserver(fitPreviewHeight);
 for (const element of [
-  document.querySelector('header'), ui.pageNavigation, ui.previewControls, ui.margins, ui.pdfNameOptions
+  document.querySelector('header'), ui.pageNavigation.parentElement, ui.margins
 ]) {
   previewLayout.observe(element);
 }
