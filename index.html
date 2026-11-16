@@ -23,6 +23,7 @@ aside{max-height:none}.page-button{display:flex;gap:8px;align-items:center}.page
 .views[data-mode=after] #original,.views[data-mode=overlay] #original{display:none}
 #comparison{overflow:auto;max-height:78vh;background:#e0e6df;padding:12px;margin-top:12px;border-radius:8px}
 .views{margin:0}canvas{border:0}.sheet{position:relative}.sheet canvas+canvas{position:absolute;inset:0;background:transparent;touch-action:pan-y}
+.views.show-guide .sheet::after{content:"";position:absolute;inset:0;pointer-events:none;clip-path:inset(1px 0 1px);background:repeating-linear-gradient(to bottom,transparent 0 calc(100% / 12 - .6px),rgb(8 124 165 / 45%) calc(100% / 12 - .6px) calc(100% / 12))}
 .viewer-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:5px 6px}
 .viewer-toolbar .actions{gap:4px}
 .viewer-toolbar :is(button,select,input){font-size:13px}
@@ -150,7 +151,7 @@ PDFをドロップ、またはクリックして選択
 </fieldset>
 <div id="comparison" tabindex="0" aria-label="補正前後の比較">
 <div class="views" id="views" data-mode="after" data-zoom="width">
-<figure id="original"><figcaption>補正前</figcaption><canvas id="before" aria-label="補正前の譜面"></canvas></figure>
+<figure id="original"><figcaption>補正前</figcaption><div class="sheet"><canvas id="before" aria-label="補正前の譜面"></canvas></div></figure>
 <figure><figcaption id="caption">補正後</figcaption><div class="sheet">
 <canvas id="after" aria-label="補正後の譜面"></canvas><canvas id="handles" aria-hidden="true"></canvas>
 </div></figure>
@@ -525,18 +526,6 @@ function draw() {
         ctx.globalAlpha = 1;
       }
     }
-    if (ui.guide.checked) {
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.strokeStyle = '#087ca5';
-      ctx.setLineDash([6,4]);
-      ctx.beginPath();
-      for (let row = 1; row < 12; row++) {
-        const y = row * h / 12;
-        ctx.moveTo(0,y);
-        ctx.lineTo(w,y);
-      }
-      ctx.stroke();
-    }
   }
   ui.handles.width = w; ui.handles.height = h;
   edgeTransform = transform.inverse();
@@ -826,7 +815,10 @@ function savePreviewPreferences() {
     }));
   } catch {}
 }
-ui.guide.onchange = () => { savePreviewPreferences(); draw(); };
+ui.guide.onchange = () => {
+  ui.views.classList.toggle('show-guide',ui.guide.checked);
+  savePreviewPreferences();
+};
 let zoomScale = 100;
 let zoomMode = 'width';
 
@@ -920,6 +912,7 @@ try {
     ui.caption.textContent = preferences.mode === 'overlay' ? '重ねて比較' : '補正後';
   }
   ui.guide.checked = preferences?.guide === true;
+  ui.views.classList.toggle('show-guide',ui.guide.checked);
   if (Number.isInteger(preferences?.opacity) && preferences.opacity >= 0 && preferences.opacity <= 100) {
     ui.opacity.value = preferences.opacity;
   }
