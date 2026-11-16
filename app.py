@@ -113,18 +113,43 @@ def poppler(*args):
 
 def pdf_dimensions(source):
     count = pdf_page_count(source)
-    info = poppler("pdfinfo", "-f", "1", "-l", str(count), str(source)).decode(errors="replace")
+    info = poppler("pdfinfo", "-box", "-f", "1", "-l", str(count), str(source)).decode(errors="replace")
     sizes = re.findall(r"Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+)", info)
     rotations = re.findall(r"Page\s+\d+\s+rot:\s+(\d+)", info)
-    if len(sizes) != count:
+    crop_boxes = re.findall(r"Page\s+\d+\s+CropBox:\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)", info)
+    if len(sizes) != count or len(rotations) != count:
         raise ValueError("PDFのページ寸法を取得できませんでした")
     dimensions = []
     for index, (w, h) in enumerate(sizes):
         w, h = float(w), float(h)
-        if rotations and int(rotations[index]) % 180:
+        if len(crop_boxes) == count:
+            left, bottom, right, top = map(float, crop_boxes[index])
+            if right > left and top > bottom:
+                w, h = round(right - left, 2), round(top - bottom, 2)
+        if int(rotations[index]) % 180:
             w, h = h, w
         dimensions.append((w, h))
     return dimensions
+
+
+def export_settings(data, count):
+    settings = json.loads(data)
+    if not isinstance(settings, list) or len(settings) != count:
+        raise ValueError("ページ設定の数が一致しません")
+    for page in settings:
+        if not isinstance(page, list) or len(page) not in (3, 4):
+            raise ValueError("ページ設定の形式が無効です")
+        angle, flip, fit = page[:3]
+        margins = page[3] if len(page) == 4 else [0, 0, 0, 0]
+        if type(angle) not in (int, float) or not -15 <= angle <= 15:
+            raise ValueError("角度は±15°以内で指定してください")
+        if type(flip) is not bool or type(fit) is not bool:
+            raise ValueError("回転・縮小の設定が無効です")
+        if not isinstance(margins, list) or len(margins) != 4 or any(
+            type(value) not in (int, float) or not 0 <= value <= 20 for value in margins
+        ):
+            raise ValueError("端の白塗りは各辺0〜20%で指定してください")
+        yield angle, flip, fit, margins
 
 
 def pdf_pages(source, folder, dimensions):
@@ -274,15 +299,10 @@ class Server(BaseHTTPRequestHandler):
             elif self.path == "/export":
                 dimensions = pdf_dimensions(source) if pdf else [None]
                 pages = pdf_pages(source, folder, dimensions) if pdf else [(source, None)]
-                settings = json.loads(settings_data)
-                if len(settings) != len(dimensions):
-                    raise ValueError("ページ設定の数が一致しません")
+                settings = list(export_settings(settings_data, len(dimensions)))
                 def images():
-                    for (path, dimensions), (angle, flip, fit, *options) in zip(pages, settings):
-                        angle = float(angle)
-                        if not math.isfinite(angle) or abs(angle) > 15:
-                            raise ValueError("角度は±15°以内で指定してください")
-                        yield corrected(rgb(path), angle, flip, fit, *options), dimensions
+                    for (path, size), (angle, flip, fit, margins) in zip(pages, settings):
+                        yield corrected(rgb(path), angle, flip, fit, margins), size
                 if pdf:
                     with tempfile.TemporaryFile(dir=folder) as output:
                         write_pdf(output, _PageStream(len(dimensions), images()))

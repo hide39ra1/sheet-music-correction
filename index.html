@@ -443,7 +443,8 @@ function orientedMargins(page) {
 }
 function marginIndex(index, page) { return (index + (page.flip ? 2 : 0)) % 4; }
 function select(index) {
-  fitPreviewHeight();
+  if (!pages[index]) return;
+  if (drag) cancelEdgeDrag();
   ui.pdfNameOptions.hidden = !isPdf;
   updatePdfName();
   ui.documentName.textContent = isPdf ? sources[0].name : path(sources[0]).split('/')[0];
@@ -470,6 +471,7 @@ function select(index) {
     ? '傾きを検出できませんでした。必要に応じて角度を調整してください。'
     : '検出した補正角度 ' + page.detected.toFixed(3) + '°';
   draw();
+  fitPreviewHeight();
 }
 function paint(canvas,page,w,h) {
   canvas.width = w; canvas.height = h;
@@ -604,6 +606,7 @@ function download(blob,name) {
   setTimeout(() => URL.revokeObjectURL(url),60000);
 }
 ui.save.onclick = async () => {
+  if (drag) cancelEdgeDrag();
   ui.status.scrollTop = 0;
   let savedImages = 0;
   let outputFolder;
