@@ -152,9 +152,9 @@ PDFをドロップ、またはクリックして選択
 <div id="adjustSidebar" class="card panel" tabindex="0" role="region" aria-labelledby="title">
 <h2 id="title"></h2>
 <div class="actions">
-<button id="less" aria-label="角度を0.1度減らす">−0.1°</button>
-<label>角度 <input id="angle" type="number" min="-15" max="15" step="0.01"> °</label>
-<button id="more" aria-label="角度を0.1度増やす">+0.1°</button>
+<button id="less" aria-label="角度を0.01度減らす">−0.01°</button>
+<label>角度 <input id="angle" type="number" min="-15" max="15" step="0.001"> °</label>
+<button id="more" aria-label="角度を0.01度増やす">+0.01°</button>
 <label><input id="flip" type="checkbox"> 180°回転</label>
 <button id="reset">このページを初期設定に戻す</button>
 </div>
@@ -185,7 +185,7 @@ PDFをドロップ、またはクリックして選択
 <dl>
 <dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>前 / 次のページ</dd>
 <dt><kbd>Home</kbd> / <kbd>End</kbd></dt><dd>最初 / 最後の読み込み済みページ</dd>
-<dt><kbd>[</kbd> / <kbd>]</kbd></dt><dd>角度を −0.1° / +0.1°</dd>
+<dt><kbd>[</kbd> / <kbd>]</kbd></dt><dd>角度を −0.01° / +0.01°</dd>
 <dt><kbd>R</kbd></dt><dd>180°回転を切り替え</dd>
 <dt><kbd>G</kbd></dt><dd>水平ガイドを切り替え</dd>
 <dt><kbd>M</kbd></dt><dd>端の白塗り調整を開閉</dd>
@@ -453,7 +453,7 @@ function select(index) {
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
   ui.detection.textContent = page.detected === null
     ? '傾きを検出できませんでした。必要に応じて角度を調整してください。'
-    : '検出した補正角度 ' + page.detected.toFixed(2) + '°';
+    : '検出した補正角度 ' + page.detected.toFixed(3) + '°';
   draw();
 }
 function paint(canvas,page,w,h) {
@@ -795,18 +795,18 @@ ui.editEdges.onchange = () => {
 };
 function nudge(delta) {
   const page = pages[active];
-  page.angle = Math.round(Math.min(15,Math.max(-15,page.angle + delta))*100)/100;
+  page.angle = Math.round(Math.min(15,Math.max(-15,page.angle + delta))*1000)/1000;
   ui.angle.value = page.angle;
   changed();
 }
-ui.less.onclick = () => nudge(-0.1);
+ui.less.onclick = () => nudge(-0.01);
 ui.resetAngle.onclick = () => {
   const page = pages[active];
   page.angle = page.detected ?? 0;
   ui.angle.value = page.angle;
   changed();
 };
-ui.more.onclick = () => nudge(0.1);
+ui.more.onclick = () => nudge(0.01);
 function savePreviewPreferences() {
   try {
     localStorage.setItem('score-preview', JSON.stringify({

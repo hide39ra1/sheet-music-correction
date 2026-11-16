@@ -50,7 +50,7 @@ def detect(image):
 def refine_angle(image, estimate):
     # Horizontal staff edges concentrate into fewer rows at the correct angle.
     gray = image.convert("L")
-    gray.thumbnail((2000, 2000), Image.Resampling.BOX)
+    gray.thumbnail((3200, 3200), Image.Resampling.BOX)
     pixels = np.asarray(gray)
     height, width = pixels.shape
     if min(height, width) < 20:
@@ -69,14 +69,18 @@ def refine_angle(image, estimate):
 
     def score(angle):
         rows = (y - x * math.tan(math.radians(angle)) + padding) * 4
-        projection = np.bincount(np.rint(rows).astype(np.int32), weights,
-                                 minlength=4*(height + 2*padding))
+        lower = rows.astype(np.int32)
+        fraction = rows - lower
+        projection = np.bincount(lower, weights * (1 - fraction),
+                                 minlength=4*(height + 2*padding) + 1)
+        projection += np.bincount(lower + 1, weights * fraction, minlength=len(projection))
         projection = cv2.GaussianBlur(projection[np.newaxis, :], (17, 1), 2)[0]
-        return np.dot(projection, projection)
+        return float(np.sum(projection * projection))
 
     coarse = max((estimate + step * 0.05 for step in range(-10, 11)), key=score)
     fine = max((coarse + step * 0.01 for step in range(-5, 6)), key=score)
-    return round(fine, 2)
+    precise = max((fine + step * 0.001 for step in range(-10, 11)), key=score)
+    return round(precise, 3)
 
 
 def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0)):
@@ -317,7 +321,7 @@ class Server(BaseHTTPRequestHandler):
                 if pdf:
                     prefix = folder / "preview"
                     poppler("pdftoppm", "-f", str(number), "-l", str(number),
-                            "-singlefile", "-cropbox", "-scale-to", "2000", "-png",
+                            "-singlefile", "-cropbox", "-scale-to", "3200", "-png",
                             str(source), str(prefix))
                     path = prefix.with_suffix(".png")
                 image = rgb(path)
