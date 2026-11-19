@@ -91,7 +91,17 @@ def refine_angle(image, estimate):
     return round(max(-15, min(15, precise)), 3)
 
 
-def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0), vertical_angle=0):
+def reduce_bleed(image, strength):
+    if not strength:
+        return image
+    pixels = np.asarray(image, dtype=np.float32)
+    cutoff = 255 - 1.55 * strength
+    pixels = np.minimum(255, pixels * 255 / cutoff)
+    return Image.fromarray(np.rint(pixels).astype(np.uint8))
+
+
+def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0), vertical_angle=0, bleed=0):
+    image = reduce_bleed(image, bleed)
     if len(margins) != 4 or any(not 0 <= value <= 20 for value in margins):
         raise ValueError("端の白塗りは各辺0〜20%で指定してください")
     top, right, bottom, left = (
@@ -189,11 +199,14 @@ def export_settings(data, count):
     if not isinstance(settings, list) or len(settings) != count:
         raise ValueError("ページ設定の数が一致しません")
     for page in settings:
-        if not isinstance(page, list) or len(page) not in (3, 4, 5):
+        if not isinstance(page, list) or len(page) not in (3, 4, 5, 6):
             raise ValueError("ページ設定の形式が無効です")
         angle, flip, fit = page[:3]
         margins = page[3] if len(page) >= 4 else [0, 0, 0, 0]
-        vertical_angle = page[4] if len(page) == 5 else 0
+        vertical_angle = page[4] if len(page) >= 5 else 0
+        bleed = page[5] if len(page) == 6 else 0
+        if type(bleed) not in (int, float) or not 0 <= bleed <= 100:
+            raise ValueError("裏写り補正は0〜100で指定してください")
         if any(type(value) not in (int, float) or not -15 <= value <= 15
                for value in (angle, vertical_angle)):
             raise ValueError("補正角度は±15°以内で指定してください")
@@ -203,7 +216,7 @@ def export_settings(data, count):
             type(value) not in (int, float) or not 0 <= value <= 20 for value in margins
         ):
             raise ValueError("端の白塗りは各辺0〜20%で指定してください")
-        yield angle, flip, fit, margins, vertical_angle
+        yield angle, flip, fit, margins, vertical_angle, bleed
 
 
 def write_pdf(output, count, pages):

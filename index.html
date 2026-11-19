@@ -180,6 +180,7 @@ PDFをドロップ、またはクリックして選択
 <button id="reset">このページを初期設定に戻す</button>
 </div>
 <p id="detection"><span id="detectedTilt"></span><span id="detectedBarline"></span><span id="detectedOrientation"></span></p>
+<fieldset><legend>裏写り補正</legend><label>強さ <input id="bleed" type="range" min="0" max="100" value="0"></label><output id="bleedValue">0</output><button id="applyBleed" type="button">全ページに適用</button><p>薄い灰色を白に近づけます。かすれた音符や鉛筆の書き込みも薄くなるため、弱い設定から調整してください。</p></fieldset>
 <button id="resetAngle">傾きを検出値に戻す</button>
 <div class="actions">
 <label><input id="fit" type="checkbox" checked> 縮小して端の欠けを防ぐ</label>
@@ -189,7 +190,7 @@ PDFをドロップ、またはクリックして選択
 <div class="actions">
 <label>対象 <select id="rotationPattern">
 <option value="even">偶数ページ</option>
-<option value="odd">奇数ページ</option>
+<option value="odd" selected>奇数ページ</option>
 <option value="all">すべて</option>
 <option value="none">なし</option>
 </select></label>
@@ -370,7 +371,7 @@ async function load(files, pdf) {
         const detectedVertical = info.verticalAngle ?? null;
         result.push({image, detected:info.angle, angle:info.angle ?? 0,
           detectedVertical, verticalAngle:detectedVertical ?? 0, detectedFlip,
-          flip:detectedFlip ?? false, tiltOnFlip:true, staffLines:info.staffLines, margins:[0,0,0,0],
+          flip:index % 2 === 0, bleed:0, tiltOnFlip:true, staffLines:info.staffLines, margins:[0,0,0,0],
           name:pdf ? (index+1) + 'ページ' : path(file)});
         showProgress();
         if (index === 0) { ui.workspace.hidden = false; ui.dropZone.hidden = true; select(0); }
@@ -486,6 +487,7 @@ function select(index) {
   else if (row.bottom > viewport.bottom) list.scrollTop += row.bottom - viewport.bottom;
   ui.title.textContent = page.name;
   ui.title.title = page.name;
+  ui.bleed.value = page.bleed; ui.bleedValue.value = page.bleed;
   ui.angle.value = page.angle; ui.verticalAngle.value = page.verticalAngle; ui.flip.checked = page.flip;
   updateTiltControls(page);
   marginInputs.forEach((input,i) => { input.value = orientedMargins(page)[i]; });
@@ -498,8 +500,7 @@ function select(index) {
   }
   ui.detectedBarline.textContent = page.detectedVertical === null ? '小節線の傾きは要確認'
     : '小節線の傾き ' + formatAngle(page.detectedVertical) + '（五線を水平にした後）';
-  ui.detectedOrientation.textContent = page.detectedFlip === null ? '上下は要確認'
-    : page.detectedFlip ? '音部記号の判定 180°（上下逆）' : '音部記号の判定 0°（正立）';
+  ui.detectedOrientation.textContent = '初期回転設定：奇数ページ180°・偶数ページ0°';
   draw();
   fitPreviewHeight();
 }
@@ -511,6 +512,34 @@ function updateTiltControls(page) {
   ui.resetAngle.disabled = !enabled || (page.angle === (page.detected ?? 0) &&
     page.verticalAngle === (page.detectedVertical ?? 0));
 }
+function bleedSource(page) {
+  if (!page.bleed) return page.image;
+  if (page.bleedCanvas && page.bleedLevel === page.bleed) return page.bleedCanvas;
+  const canvas = document.createElement('canvas');
+  canvas.width = page.image.width; canvas.height = page.image.height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(page.image,0,0);
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const cutoff = 255 - 1.55 * page.bleed;
+  for (let i=0; i<data.data.length; i+=4) {
+    for (let channel=0; channel<3; channel++) {
+      data.data[i+channel] = Math.round(Math.min(255,data.data[i+channel]*255/cutoff));
+    }
+  }
+  ctx.putImageData(data,0,0);
+  page.bleedCanvas = canvas; page.bleedLevel = page.bleed;
+  return canvas;
+}
+ui.bleed.oninput = () => {
+  pages[active].bleed = Number(ui.bleed.value);
+  ui.bleedValue.value = ui.bleed.value;
+  changed();
+};
+ui.applyBleed.onclick = () => {
+  const strength = pages[active].bleed;
+  pages.forEach(page => { page.bleed = strength; delete page.thumbnail; delete page.bleedCanvas; });
+  changed();
+};
 function paint(canvas,page,w,h) {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
@@ -530,7 +559,7 @@ function paint(canvas,page,w,h) {
   ctx.transform(xx,yx,xy,yy,0,0);
   // The source is turned before the tilt transform above is applied.
   if (page.flip) ctx.scale(-1,-1);
-  ctx.drawImage(page.image,-w/2,-h/2,w,h);
+  ctx.drawImage(bleedSource(page),-w/2,-h/2,w,h);
   const [top,right,bottom,left] = page.margins.map((value,i) => value*(i%2 ? w : h)/100);
   ctx.fillRect(-w/2,-h/2,w,top);
   ctx.fillRect(w/2-right,-h/2,right,h);
@@ -662,7 +691,7 @@ ui.save.onclick = async () => {
   ui.save.textContent = '保存中…';
   const settings = pages.map(page => {
     const tilt = useTilt(page);
-    return [tilt ? page.angle : 0,page.flip,ui.fit.checked,[...page.margins],tilt ? page.verticalAngle : 0];
+    return [tilt ? page.angle : 0,page.flip,ui.fit.checked,[...page.margins],tilt ? page.verticalAngle : 0,page.bleed];
   });
   try {
     if (isPdf) {
@@ -951,7 +980,8 @@ ui.reset.onclick = () => {
   const page = pages[active];
   page.angle = page.detected ?? 0;
   page.verticalAngle = page.detectedVertical ?? 0;
-  page.flip = page.detectedFlip ?? false;
+  page.flip = active % 2 === 0;
+  page.bleed = 0;
   page.tiltOnFlip = true;
   page.margins = [0,0,0,0];
   changed(); select(active);
