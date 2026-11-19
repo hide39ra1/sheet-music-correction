@@ -94,10 +94,12 @@ def refine_angle(image, estimate):
 def reduce_bleed(image, strength):
     if not strength:
         return image
-    pixels = np.asarray(image, dtype=np.float32)
+    pixels = np.array(image.convert("RGB"))
     cutoff = 255 - 1.55 * strength
-    pixels = np.minimum(255, pixels * 255 / cutoff)
-    return Image.fromarray(np.rint(pixels).astype(np.uint8))
+    brightness = (pixels[:, :, 0].astype(np.float32) * .299
+                  + pixels[:, :, 1] * .587 + pixels[:, :, 2] * .114)
+    pixels[brightness >= cutoff] = 255
+    return Image.fromarray(pixels)
 
 
 def corrected(image, angle, flip, fit, margins=(0, 0, 0, 0), vertical_angle=0, bleed=0):
